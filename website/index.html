@@ -3,46 +3,98 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="SBILL — Simple Billing. Smarter Business.">
+<meta name="description" content="SBILL — Simple Billing. Smarter Business. Offline-first billing, inventory, customers, invoices and analytics.">
+<meta name="theme-color" content="#2563eb">
 <title>SBILL — Simple Billing. Smarter Business.</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<header>
-  <div class="brand"><span class="mark">S</span>SBILL</div>
-  <nav><a href="#features">Features</a><a href="#offline">Offline-first</a><a href="#download">Download</a></nav>
+<header class="nav">
+  <a class="brand" href="#top" aria-label="SBILL home"><span class="mark">S</span><span>SBILL</span></a>
+  <nav aria-label="Primary">
+    <a href="#features">Features</a>
+    <a href="#privacy">Privacy</a>
+    <a href="#workflow">How it works</a>
+    <a href="#download">Download</a>
+  </nav>
 </header>
-<main>
-<section class="hero">
-  <div>
+
+<main id="top">
+<section class="hero section">
+  <div class="hero-copy">
     <p class="eyebrow">BILLING • INVENTORY • BUSINESS</p>
     <h1>Simple Billing.<br><span>Smarter Business.</span></h1>
-    <p class="lead">Offline-first billing and inventory management built for modern small businesses.</p>
-    <div class="actions"><a class="primary" href="#download">Download SBILL</a><a class="secondary" href="#features">Explore features</a></div>
+    <p class="lead">A focused shop-management app for fast checkout, inventory control, customer records, invoices and day-to-day business visibility.</p>
+    <div class="actions">
+      <a class="primary" href="#download">Get SBILL</a>
+      <a class="secondary" href="#features">Explore features</a>
+    </div>
+    <div class="chips"><span>Offline-first</span><span>Local SQLite</span><span>Material 3</span><span>Android • Windows • macOS</span></div>
   </div>
-  <div class="mock"><div class="window">
-    <div class="windowbar"><b>SBILL</b><span>Dashboard</span></div>
-    <div class="stats"><div><small>Today’s sales</small><strong>₹24,850</strong></div><div><small>Invoices</small><strong>38</strong></div><div><small>Average bill</small><strong>₹654</strong></div></div>
-    <div class="checkout"><div><h3>Quick billing</h3><p>Search products, add to cart and checkout in seconds.</p></div><button>Checkout</button></div>
-  </div></div>
+  <div class="product-stage">
+    <div class="device">
+      <div class="device-top"><b>SBILL</b><span>Dashboard</span></div>
+      <div class="device-stats">
+        <div><small>Today’s sales</small><strong>₹24,850</strong></div>
+        <div><small>Invoices</small><strong>38</strong></div>
+        <div><small>Low stock</small><strong>4</strong></div>
+      </div>
+      <div class="device-panel">
+        <div><div class="mini-title">Quick billing</div><div class="muted">Search product → cart → payment → invoice</div></div>
+        <button>Checkout</button>
+      </div>
+    </div>
+  </div>
 </section>
-<section id="features">
-  <p class="eyebrow">BUILT FOR SHOPS</p><h2>Everything important. Nothing bloated.</h2>
+
+<section id="features" class="section">
+  <p class="eyebrow">CORE WORKFLOWS</p>
+  <h2>Built around the work a shop actually does.</h2>
   <div class="grid">
-    <article><b>Offline Billing</b><p>Keep selling even when the internet disappears.</p></article>
-    <article><b>Inventory</b><p>Products, stock levels, SKUs and low-stock signals.</p></article>
-    <article><b>Fast Checkout</b><p>A responsive cart designed for keyboard and touch.</p></article>
-    <article><b>Invoices</b><p>Generate professional invoice documents.</p></article>
-    <article><b>Customers</b><p>Keep customer records organized.</p></article>
-    <article><b>Analytics</b><p>See sales and business signals without clutter.</p></article>
+    <article><span class="icon">₹</span><h3>Fast billing</h3><p>Search by name, SKU or barcode, edit quantities, apply discounts, choose payment method and checkout without leaving the flow.</p></article>
+    <article><span class="icon">▣</span><h3>Inventory</h3><p>Manage SKUs, pricing, taxes, stock, categories and low-stock thresholds with responsive desktop and mobile layouts.</p></article>
+    <article><span class="icon">◎</span><h3>Customers</h3><p>Store customer details, edit records and view purchase history directly from the app.</p></article>
+    <article><span class="icon">▤</span><h3>Invoices</h3><p>Open invoice details and print, share or save A4 documents and compact thermal receipts.</p></article>
+    <article><span class="icon">↗</span><h3>Analytics</h3><p>See today’s sales, invoice count, average bill, low-stock items and a seven-day sales view.</p></article>
+    <article><span class="icon">⌁</span><h3>Keyboard ready</h3><p>Desktop-friendly shortcuts keep the billing counter fast: F2 search, F4 customer, F8 hold, F9 payment and F12 checkout.</p></article>
   </div>
 </section>
-<section id="offline" class="split">
-  <div><p class="eyebrow">LOCAL-FIRST</p><h2>Your shop doesn't stop when the internet does.</h2><p>SBILL writes business data locally first. Synchronization can happen when connectivity returns, while billing remains usable offline.</p></div>
-  <div class="quote">LOCAL DATA → BILLING → SYNC QUEUE → CLOUD</div>
+
+<section id="privacy" class="section split">
+  <div>
+    <p class="eyebrow">LOCAL-FIRST</p>
+    <h2>Your counter keeps working when the network doesn't.</h2>
+    <p class="large">Business data is written to local SQLite first. Cloud sync is optional, authenticated and retryable, so internet loss does not block everyday billing.</p>
+  </div>
+  <div class="trust-card">
+    <div class="flow">LOCAL SQLITE <span>→</span> BILLING <span>→</span> SYNC QUEUE <span>→</span> SUPABASE</div>
+    <div class="trust-grid"><b>No client service-role key</b><b>Business-scoped RLS</b><b>Idempotent entity IDs</b><b>Retryable queue</b></div>
+  </div>
 </section>
-<section id="download" class="cta"><h2>Ready to simplify your billing?</h2><p>Android, Windows and macOS are supported by the production build pipeline.</p><a class="primary" href="https://github.com/shinuXcode/shop-inventory-app">View on GitHub</a></section>
+
+<section id="workflow" class="section">
+  <p class="eyebrow">HOW IT WORKS</p>
+  <h2>A predictable counter flow.</h2>
+  <div class="steps">
+    <div><b>01</b><span>Find product</span><p>Search name, SKU or barcode.</p></div>
+    <div><b>02</b><span>Build cart</span><p>Adjust quantity and customer details.</p></div>
+    <div><b>03</b><span>Take payment</span><p>Choose cash, UPI, card or credit.</p></div>
+    <div><b>04</b><span>Issue invoice</span><p>Print, save or share the receipt.</p></div>
+  </div>
+</section>
+
+<section id="download" class="section cta">
+  <p class="eyebrow">START WITH THE SOURCE</p>
+  <h2>SBILL is built as a real Flutter project.</h2>
+  <p>Use the repository for development builds and release artifacts as they are published.</p>
+  <div class="actions center">
+    <a class="primary" href="https://github.com/shinuXcode/shop-inventory-app">GitHub repository</a>
+    <a class="secondary" href="https://github.com/shinuXcode/shop-inventory-app/releases">Releases</a>
+  </div>
+  <div class="platforms"><span>Android</span><span>Windows</span><span>macOS</span></div>
+</section>
 </main>
+
 <footer>SBILL · Simple Billing. Smarter Business.</footer>
 </body>
 </html>
