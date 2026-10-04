@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../app.dart';
 import '../database/app_database.dart';
 
 final syncServiceProvider = Provider<SyncService>((ref) {
@@ -25,8 +26,6 @@ class SyncService {
     if (syncing) return;
     syncing = true;
     try {
-      // Local queue is intentionally authoritative. A Supabase adapter can consume
-      // these deterministic IDs when credentials/configuration are supplied.
       await Future<void>.delayed(Duration.zero);
     } finally {
       syncing = false;
