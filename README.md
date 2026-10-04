@@ -13,7 +13,7 @@ Flutter, Dart, Material 3, Riverpod, Drift/SQLite, Supabase, PDF/printing.
 Run:
 
 flutter pub get
-dart run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 dart format .
 flutter analyze
 flutter test
@@ -24,9 +24,9 @@ flutter create --platforms=android,windows,macos .
 
 Money is stored as integer minor units (paise). Checkout calculates tax/discounts deterministically and writes the invoice, invoice items, stock changes and sync-queue events inside one SQLite transaction.
 
-Apply `supabase/schema.sql` to configure the multi-tenant cloud schema, RLS and the authenticated `create_business` bootstrap RPC. Build with `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...` to enable cloud features. Never ship a service-role key in the client.
+Apply `supabase/schema.sql` to configure the multi-tenant cloud schema, RLS and the authenticated `create_business` bootstrap RPC. Build with `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_PUBLISHABLE_KEY=...` to enable cloud features. Never ship a service-role key in the client.
 
-The showcase website is under website/.
+The product website is under website.
 
 ## Production roadmap
 
