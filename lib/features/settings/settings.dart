@@ -82,7 +82,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _cloudAuth() async {
     if (!CloudConfig.configured) {
-      _showMessage('Build with SUPABASE_URL and SUPABASE_ANON_KEY to enable cloud sync.');
+      _showMessage('Build with SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to enable cloud sync.');
       return;
     }
     final emailController = TextEditingController(text: email.text.trim());
