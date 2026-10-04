@@ -113,7 +113,6 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         LogicalKeySet(LogicalKeyboardKey.f8): const _BillingActionIntent('hold'),
         LogicalKeySet(LogicalKeyboardKey.f9): const _BillingActionIntent('payment'),
         LogicalKeySet(LogicalKeyboardKey.f12): const _BillingActionIntent('checkout'),
-        LogicalKeySet(LogicalKeyboardKey.escape): const _BillingActionIntent('escape'),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -125,7 +124,6 @@ class _BillingPageState extends ConsumerState<BillingPage> {
                 case 'hold': _holdCart(); break;
                 case 'payment': _paymentDialog(); break;
                 case 'checkout': _checkout(); break;
-                case 'escape': FocusManager.instance.primaryFocus?.unfocus(); break;
               }
               return null;
             },
