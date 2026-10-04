@@ -84,6 +84,7 @@ class SyncQueue extends Table {
 @DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+  AppDatabase.forTesting() : super(NativeDatabase.memory());
   @override int get schemaVersion => 1;
 
   Stream<List<Item>> watchActiveItems() => (select(items)
