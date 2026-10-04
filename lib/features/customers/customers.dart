@@ -168,31 +168,33 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
     final notes = TextEditingController(text: customer?.notes ?? '');
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: Text(customer == null ? 'Add customer' : 'Edit customer'),
-        content: SizedBox(
-          width: 500,
-          child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextField(controller: name, autofocus: true, decoration: const InputDecoration(labelText: 'Name *')),
-              const SizedBox(height: 10),
-              TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone')),
-              const SizedBox(height: 10),
-              TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
-              const SizedBox(height: 10),
-              TextField(controller: address, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Address')),
-              const SizedBox(height: 10),
-              TextField(controller: notes, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Notes')),
-            ]),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(customer == null ? 'Add customer' : 'Edit customer'),
+          content: SizedBox(
+            width: 500,
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(controller: name, autofocus: true, onChanged: (_) => setDialogState(() {}), decoration: const InputDecoration(labelText: 'Name *')),
+                const SizedBox(height: 10),
+                TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone')),
+                const SizedBox(height: 10),
+                TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
+                const SizedBox(height: 10),
+                TextField(controller: address, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Address')),
+                const SizedBox(height: 10),
+                TextField(controller: notes, minLines: 1, maxLines: 3, decoration: const InputDecoration(labelText: 'Notes')),
+              ]),
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: name.text.trim().isEmpty ? null : () => Navigator.pop(dialogContext, true),
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: name.text.trim().isEmpty ? null : () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
     if (ok != true || name.text.trim().isEmpty) return;
