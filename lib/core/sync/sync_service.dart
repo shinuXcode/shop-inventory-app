@@ -43,11 +43,16 @@ class SyncService {
     lastError = null;
     try {
       final queue = await db.pendingSyncQueue(limit: 100);
-      await _pushBusiness(settings, businessId, client);
+      try {
+        await _pushBusiness(settings, businessId, client);
+      } catch (e) {
+        lastError = 'Business settings sync: ' + e.toString();
+      }
       for (final event in queue) {
         try {
           if (event.attempts > 0) {
-            final seconds = 1 << (event.attempts.clamp(1, 3) - 1);
+            final retry = event.attempts.clamp(1, 3).toInt();
+            final seconds = 1 << (retry - 1);
             await Future<void>.delayed(Duration(seconds: seconds));
           }
           await _push(event, businessId, client);
