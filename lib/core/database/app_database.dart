@@ -22,7 +22,7 @@ class Items extends Table {
   DateTimeColumn get updatedAt => dateTime()();
   TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
   DateTimeColumn get lastSyncedAt => dateTime().nullable()();
-  @override String get primaryKey => 'id';
+  @override Set<Column<Object>> get primaryKey => {id};
 }
 
 class Customers extends Table {
