@@ -145,20 +145,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final name = TextEditingController(text: business.text);
     final id = await showDialog<String>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Create workspace'),
-        content: TextField(
-          controller: name,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Business name'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: name.text.trim().isEmpty ? null : () => Navigator.pop(context, name.text.trim()),
-            child: const Text('Create'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Create workspace'),
+          content: TextField(
+            controller: name,
+            autofocus: true,
+            onChanged: (_) => setDialogState(() {}),
+            decoration: const InputDecoration(labelText: 'Business name'),
           ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: name.text.trim().isEmpty ? null : () => Navigator.pop(dialogContext, name.text.trim()),
+              child: const Text('Create'),
+            ),
+          ],
+        ),
       ),
     );
     if (id == null || id.isEmpty) return;
