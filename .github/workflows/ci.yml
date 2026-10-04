@@ -1,5 +1,6 @@
 name: SBILL CI
 on:
+  workflow_dispatch:
   push:
     branches: [main, "feature/**"]
   pull_request:
@@ -29,6 +30,19 @@ jobs:
       - run: flutter create --platforms=android,windows,macos .
       - run: flutter build apk --debug
       - run: flutter build apk --release
+      - name: Verify Android APK
+        shell: bash
+        run: |
+          APK="build/app/outputs/flutter-apk/app-release.apk"
+          APKSIGNER="$(find "${ANDROID_HOME}/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          ZIPALIGN="$(find "${ANDROID_HOME}/build-tools" -name zipalign -type f | sort -V | tail -n 1)"
+          test -s "$APK"
+          test -n "$APKSIGNER"
+          test -n "$ZIPALIGN"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          "$ZIPALIGN" -c -v 4 "$APK"
+          "$ZIPALIGN" -c -P 16 -v 4 "$APK"
+          unzip -t "$APK"
       - uses: actions/upload-artifact@v4
         with:
           name: sbill-android-apk
