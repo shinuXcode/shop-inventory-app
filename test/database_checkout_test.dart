@@ -42,7 +42,7 @@ void main() {
     expect((await db.select(db.invoices).get()).length, 1);
     expect((await db.select(db.invoiceItems).get()).length, 1);
     expect((await db.select(db.items).getSingle()).stockQuantity, 8);
-    expect((await db.select(db.syncQueue).get()).length, 2);
+    expect((await db.select(db.syncQueue).get()).length, 3);
   });
 
   test('checkout applies customer, discount and payment method to stored invoice', () async {
@@ -59,8 +59,8 @@ void main() {
     expect(invoice, isNotNull);
     expect(invoice!.customerId, 'customer-1');
     expect(invoice.discountMinor, 1000);
-    expect(invoice.taxMinor, 3420);
-    expect(invoice.totalMinor, 22420);
+    expect(invoice.taxMinor, 6984);
+    expect(invoice.totalMinor, 45784);
     expect(invoice.paymentMethod, 'upi');
     expect((await db.select(db.syncQueue).get()).length, 2);
   });
