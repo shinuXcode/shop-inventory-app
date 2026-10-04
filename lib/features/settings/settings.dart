@@ -129,11 +129,32 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         );
         _showMessage('Signed in as ' + emailController.text.trim());
       }
+      await _loadExistingWorkspace();
       if (mounted) setState(() {});
     } on AuthException catch (e) {
       _showMessage(e.message);
     } catch (e) {
       _showMessage('Cloud authentication failed: ' + e.toString());
+    }
+  }
+
+  Future<void> _loadExistingWorkspace() async {
+    if (!_signedIn || settings.businessId != null) return;
+    try {
+      final client = Supabase.instance.client;
+      final user = client.auth.currentUser;
+      if (user == null) return;
+      final rows = await client
+          .from('business_members')
+          .select('business_id')
+          .eq('user_id', user.id);
+      if (rows.isEmpty) return;
+      final id = rows.first['business_id']?.toString();
+      if (id == null || id.isEmpty) return;
+      await _prefs.setString('businessId', id);
+      if (mounted) setState(() {});
+    } catch (e) {
+      _showMessage('Workspace discovery failed: ' + e.toString());
     }
   }
 
