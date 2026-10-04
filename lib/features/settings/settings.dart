@@ -55,6 +55,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       thermalReceipt: thermal,
       darkMode: dark,
     );
+    await ref.read(themeModeProvider.notifier).setDarkMode(dark);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings saved locally')));
     }
