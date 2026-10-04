@@ -22,14 +22,14 @@ For a clean checkout, platform folders can be generated with:
 
 flutter create --platforms=android,windows,macos .
 
-Money is stored as integer minor units (paise). Checkout writes invoice, invoice items, stock changes and sync-queue data inside one SQLite transaction.
+Money is stored as integer minor units (paise). Checkout calculates tax/discounts deterministically and writes the invoice, invoice items, stock changes and sync-queue events inside one SQLite transaction.
 
-Apply supabase/schema.sql to configure the cloud schema and RLS. Never ship a service-role key in the client.
+Apply `supabase/schema.sql` to configure the multi-tenant cloud schema, RLS and the authenticated `create_business` bootstrap RPC. Build with `--dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...` to enable cloud features. Never ship a service-role key in the client.
 
 The showcase website is under website/.
 
 ## Production roadmap
 
-SBILL is being implemented phase-by-phase. The current main branch contains the offline-first foundation, transactional local checkout, deterministic billing engine, inventory editing/deactivation, persistent business settings, and the multi-tenant Supabase schema/RLS foundation.
+SBILL now includes the production-critical offline POS flow: deterministic billing, editable carts, customer selection/history, payment methods, responsive inventory, invoice detail with A4/thermal PDF actions, persistent settings, optional Supabase authentication/workspace sync, dashboard analytics, responsive showcase site and cross-platform CI build jobs.
 
-Cloud synchronization, full authentication/workspace onboarding, thermal receipts, complete invoice workflows, desktop shortcuts, expanded analytics, and final release builds remain explicit release-gate work. See `docs/ARCHITECTURE.md` and `docs/RELEASE_CHECKLIST.md`.
+Final release gating still requires successful CI verification of the generated Android, Windows and macOS release artifacts plus multi-device conflict/pull validation. See `docs/ARCHITECTURE.md` and `docs/RELEASE_CHECKLIST.md`.
