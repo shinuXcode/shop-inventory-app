@@ -18,10 +18,12 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 class SyncService {
   SyncService(this.db) {
     _subscription = Connectivity().onConnectivityChanged.listen(_onConnectivity);
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => syncNow());
   }
 
   final AppDatabase db;
   late final StreamSubscription<List<ConnectivityResult>> _subscription;
+  late final Timer _timer;
   bool syncing = false;
   String? lastError;
 
@@ -317,5 +319,8 @@ class SyncService {
     ));
   }
 
-  void dispose() => _subscription.cancel();
+  void dispose() {
+    _subscription.cancel();
+    _timer.cancel();
+  }
 }
