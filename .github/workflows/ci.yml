@@ -45,7 +45,7 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter create --platforms=windows .
-      - run: flutter build windows
+      - run: flutter build windows --release
       - uses: actions/upload-artifact@v4
         with:
           name: sbill-windows-build
@@ -63,7 +63,7 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter create --platforms=macos .
-      - run: flutter build macos
+      - run: flutter build macos --release
       - uses: actions/upload-artifact@v4
         with:
           name: sbill-macos-build
