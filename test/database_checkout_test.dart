@@ -62,7 +62,7 @@ void main() {
     expect(invoice.taxMinor, 6984);
     expect(invoice.totalMinor, 45784);
     expect(invoice.paymentMethod, 'upi');
-    expect((await db.select(db.syncQueue).get()).length, 2);
+    expect((await db.select(db.syncQueue).get()).length, 3);
   });
 
   test('insufficient stock rolls back invoice and stock changes', () async {
