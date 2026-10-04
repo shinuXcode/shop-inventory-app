@@ -158,14 +158,26 @@ drop policy if exists "members can read invoice items" on public.invoice_items;
 create policy "members can read invoice items" on public.invoice_items for select using (public.is_business_member(business_id));
 drop policy if exists "members can insert invoice items" on public.invoice_items;
 create policy "members can insert invoice items" on public.invoice_items for insert with check (
-  public.is_business_member(business_id)
-  and exists (select 1 from public.invoices i where i.id = invoice_id and i.business_id = business_id)
+  public.is_business_member(public.invoice_items.business_id)
+  and exists (
+    select 1
+    from public.invoices i
+    where i.id = public.invoice_items.invoice_id
+      and i.business_id = public.invoice_items.business_id
+  )
 );
 
 drop policy if exists "members can update invoice items" on public.invoice_items;
-create policy "members can update invoice items" on public.invoice_items for update using (public.is_business_member(business_id)) with check (
-  public.is_business_member(business_id)
-  and exists (select 1 from public.invoices i where i.id = invoice_id and i.business_id = business_id)
+create policy "members can update invoice items" on public.invoice_items for update using (
+  public.is_business_member(public.invoice_items.business_id)
+) with check (
+  public.is_business_member(public.invoice_items.business_id)
+  and exists (
+    select 1
+    from public.invoices i
+    where i.id = public.invoice_items.invoice_id
+      and i.business_id = public.invoice_items.business_id
+  )
 );
 
 drop policy if exists "members can read sync events" on public.sync_events;
@@ -209,4 +221,5 @@ begin
 end;
 $$;
 
+revoke all on function public.create_business(text,text,text,text,text,text) from public;
 grant execute on function public.create_business(text,text,text,text,text,text) to authenticated;
