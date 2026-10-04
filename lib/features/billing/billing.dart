@@ -108,12 +108,12 @@ class _BillingPageState extends ConsumerState<BillingPage> {
 
     return Shortcuts(
       shortcuts: <LogicalKeySet, Intent>{
-        LogicalKeyboardKey.f2: const _BillingActionIntent('search'),
-        LogicalKeyboardKey.f4: const _BillingActionIntent('customer'),
-        LogicalKeyboardKey.f8: const _BillingActionIntent('hold'),
-        LogicalKeyboardKey.f9: const _BillingActionIntent('payment'),
-        LogicalKeyboardKey.f12: const _BillingActionIntent('checkout'),
-        LogicalKeyboardKey.escape: const _BillingActionIntent('escape'),
+        LogicalKeySet(LogicalKeyboardKey.f2): const _BillingActionIntent('search'),
+        LogicalKeySet(LogicalKeyboardKey.f4): const _BillingActionIntent('customer'),
+        LogicalKeySet(LogicalKeyboardKey.f8): const _BillingActionIntent('hold'),
+        LogicalKeySet(LogicalKeyboardKey.f9): const _BillingActionIntent('payment'),
+        LogicalKeySet(LogicalKeyboardKey.f12): const _BillingActionIntent('checkout'),
+        LogicalKeySet(LogicalKeyboardKey.escape): const _BillingActionIntent('escape'),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
