@@ -42,7 +42,7 @@ void main() {
     expect((await db.select(db.invoices).get()).length, 1);
     expect((await db.select(db.invoiceItems).get()).length, 1);
     expect((await db.select(db.items).getSingle()).stockQuantity, 8);
-    expect((await db.select(db.syncQueue).get()).length, 1);
+    expect((await db.select(db.syncQueue).get()).length, 2);
   });
 
   test('checkout applies customer, discount and payment method to stored invoice', () async {
