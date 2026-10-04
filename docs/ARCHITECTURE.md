@@ -6,11 +6,11 @@
 - Screens: Dashboard, Billing, Inventory, Customers, Invoices.
 - Routing/navigation: adaptive NavigationRail/NavigationBar shell; no dedicated route package yet.
 - Database: Drift/SQLite with Items, Customers, Invoices, InvoiceItems and SyncQueue.
-- Cloud: Supabase schema/RLS is currently a foundation only; synchronization is not yet implemented.
-- Website: static responsive showcase under website/.
+- Cloud: optional Supabase Auth + PostgreSQL/RLS with email authentication, workspace bootstrap RPC, persisted sync queue and idempotent upserts.
+- Website: responsive static showcase under website/ with feature, privacy, workflow and download sections.
 - Assets: no external asset pipeline currently required; Material icons are used.
 - Tests: a basic cart unit test exists.
-- CI/CD: GitHub Actions currently runs dependency generation, formatting, analysis, tests and Android debug build.
+- CI/CD: GitHub Actions runs generation, formatting, analysis, tests, Android debug/release, Windows and macOS builds.
 
 ## Proposed production architecture
 - Presentation: feature pages + Riverpod state/controllers.
