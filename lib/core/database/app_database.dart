@@ -212,6 +212,10 @@ class AppDatabase extends _$AppDatabase {
 
       await into(syncQueue).insert(SyncQueueCompanion.insert(
         entityType: 'invoice', entityId: invoiceId, operation: 'upsert', createdAt: now));
+      for (final line in cart) {
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'item', entityId: line.item.id, operation: 'upsert', createdAt: now));
+      }
     });
   }
 
