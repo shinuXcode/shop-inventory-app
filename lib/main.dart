@@ -14,7 +14,7 @@ Future<void> main() async {
   if (CloudConfig.configured) {
     await Supabase.initialize(
       url: CloudConfig.url,
-      anonKey: CloudConfig.anonKey,
+      publishableKey: CloudConfig.publishableKey,
     );
   }
 
