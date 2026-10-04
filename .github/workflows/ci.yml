@@ -4,14 +4,16 @@ on:
     branches: [main, "feature/**"]
   pull_request:
     branches: [main]
+
 jobs:
-  flutter:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
       - run: flutter pub get
       - run: dart run build_runner build --delete-conflicting-outputs
       - run: dart format --output=none --set-exit-if-changed .
@@ -19,3 +21,34 @@ jobs:
       - run: flutter test
       - run: flutter create --platforms=android,windows,macos .
       - run: flutter build apk --debug
+      - run: flutter build apk --release
+      - run: test -s website/index.html
+      - run: test -s website/styles.css
+
+  windows:
+    runs-on: windows-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter create --platforms=windows .
+      - run: flutter build windows
+
+  macos:
+    runs-on: macos-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter create --platforms=macos .
+      - run: flutter build macos
