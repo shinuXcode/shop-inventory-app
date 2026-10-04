@@ -27,7 +27,7 @@ class ThemeModeController extends Notifier<ThemeMode> {
   }
 
   Future<void> setDarkMode(bool enabled) async {
-    state = enabled ? ThemeMode.dark : ThemeMode.system;
+    state = enabled ? ThemeMode.dark : ThemeMode.light;
     await ref.read(sharedPreferencesProvider).setBool('darkMode', enabled);
   }
 }
