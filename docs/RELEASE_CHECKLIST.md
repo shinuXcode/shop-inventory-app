@@ -20,6 +20,7 @@
 - [ ] Android release artifact verified in CI
 - [ ] Windows release artifact verified in CI
 - [ ] macOS release artifact verified in CI
+- [ ] iOS unsigned compile verified in CI
 
 ## Mandatory release gate
 Run:
@@ -31,5 +32,6 @@ Run:
 - flutter build apk --release
 - flutter build windows --release
 - flutter build macos --release
+- flutter build ios --no-codesign
 
 Only mark SBILL production-ready after all supported builds and acceptance tests pass.
