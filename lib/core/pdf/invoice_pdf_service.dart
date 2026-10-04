@@ -62,7 +62,7 @@ class InvoicePdfService {
         ]),
       ]),
       pw.SizedBox(height: 18),
-      pw.Table.fromTextArray(
+      pw.TableHelper.fromTextArray(
         headers: const ['Item', 'Qty', 'Unit', 'Tax', 'Total'],
         data: items.map((x) => [
           x.itemNameSnapshot,
