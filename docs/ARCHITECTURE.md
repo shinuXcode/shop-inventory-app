@@ -7,10 +7,10 @@
 - Routing/navigation: adaptive NavigationRail/NavigationBar shell; no dedicated route package yet.
 - Database: Drift/SQLite with Items, Customers, Invoices, InvoiceItems and SyncQueue.
 - Cloud: optional Supabase Auth + PostgreSQL/RLS with email authentication, workspace bootstrap RPC, persisted sync queue and idempotent upserts.
-- Website: responsive static showcase under website/ with feature, privacy, workflow and download sections.
+- Website: responsive static product website under website/ with feature, privacy, workflow and download sections.
 - Assets: no external asset pipeline currently required; Material icons are used.
 - Tests: a basic cart unit test exists.
-- CI/CD: GitHub Actions runs generation, formatting, analysis, tests, Android debug/release, Windows and macOS builds.
+- CI/CD: GitHub Actions pins the Flutter toolchain and verifies analysis, tests, Android, Windows, macOS and unsigned iOS compilation.
 
 ## Proposed production architecture
 - Presentation: feature pages + Riverpod state/controllers.
