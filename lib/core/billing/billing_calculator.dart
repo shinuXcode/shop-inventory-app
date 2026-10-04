@@ -42,9 +42,11 @@ class BillingCalculator {
       throw ArgumentError('Discount cannot exceed subtotal.');
     }
     final taxable = subtotal - discountMinor;
-    final tax = lines.isEmpty
-        ? 0
-        : taxFor(taxable, lines.fold<int>(0, (sum, line) => line.taxRateBps) ~/ lines.length);
+    final tax = lines.fold<int>(0, (sum, line) {
+      final lineBase = lineSubtotal(line);
+      final lineDiscount = subtotal == 0 ? 0 : ((lineBase * discountMinor) / subtotal).round();
+      return sum + taxFor(lineBase - lineDiscount, line.taxRateBps);
+    });
     return BillingTotals(
       subtotalMinor: subtotal,
       taxMinor: tax,
