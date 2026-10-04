@@ -4,6 +4,7 @@ import '../billing/billing.dart';
 import '../inventory/inventory.dart';
 import '../customers/customers.dart';
 import '../invoices/invoices.dart';
+import '../settings/settings.dart';
 
 class Shell extends StatefulWidget {
   const Shell({super.key});
@@ -13,12 +14,12 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   int index = 0;
   final pages = const [
-    DashboardPage(), BillingPage(), InventoryPage(), CustomersPage(), InvoicesPage()
+    DashboardPage(), BillingPage(), InventoryPage(), CustomersPage(), InvoicesPage(), SettingsPage()
   ];
-  final labels = const ['Dashboard', 'Billing', 'Inventory', 'Customers', 'Invoices'];
+  final labels = const ['Dashboard', 'Billing', 'Inventory', 'Customers', 'Invoices', 'Settings'];
   final icons = const [
-    Icons.dashboard_outlined, Icons.point_of_sale_outlined,
-    Icons.inventory_2_outlined, Icons.people_outline, Icons.receipt_long_outlined
+    Icons.dashboard_outlined, Icons.point_of_sale_outlined, Icons.inventory_2_outlined,
+    Icons.people_outline, Icons.receipt_long_outlined, Icons.settings_outlined
   ];
 
   @override
