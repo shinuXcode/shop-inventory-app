@@ -43,8 +43,13 @@ class SyncService {
     lastError = null;
     try {
       final queue = await db.pendingSyncQueue(limit: 100);
+      await _pushBusiness(settings, businessId, client);
       for (final event in queue) {
         try {
+          if (event.attempts > 0) {
+            final seconds = 1 << (event.attempts.clamp(1, 3) - 1);
+            await Future<void>.delayed(Duration(seconds: seconds));
+          }
           await _push(event, businessId, client);
           await db.deleteSyncQueueEntry(event.id);
         } catch (e) {
@@ -81,6 +86,23 @@ class SyncService {
     final value = row['updated_at'];
     final remote = DateTime.tryParse(value?.toString() ?? '');
     return remote != null && remote.toUtc().isAfter(localUpdatedAt.toUtc());
+  }
+
+  Future<void> _pushBusiness(
+    AppSettings settings,
+    String businessId,
+    SupabaseClient client,
+  ) async {
+    await client.from('businesses').update({
+      'name': settings.businessName,
+      'phone': settings.businessPhone.isEmpty ? null : settings.businessPhone,
+      'email': settings.businessEmail.isEmpty ? null : settings.businessEmail,
+      'address': settings.businessAddress.isEmpty ? null : settings.businessAddress,
+      'gst_number': settings.gstNumber.isEmpty ? null : settings.gstNumber,
+      'currency': settings.currency,
+      'invoice_prefix': settings.invoicePrefix,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', businessId);
   }
 
   Future<void> _push(SyncQueueData event, String businessId, SupabaseClient client) async {
