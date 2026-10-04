@@ -45,6 +45,26 @@ void main() {
     expect((await db.select(db.syncQueue).get()).length, 1);
   });
 
+  test('checkout applies customer, discount and payment method to stored invoice', () async {
+    final item = await seedItem();
+    await db.checkout(
+      invoiceId: 'invoice-discount',
+      invoiceNumber: 'INV-DISCOUNT',
+      customerId: 'customer-1',
+      cart: [CartLine(id: 'line-discount', item: item, quantity: 2)],
+      discountMinor: 1000,
+      paymentMethod: 'upi',
+    );
+    final invoice = await db.invoiceById('invoice-discount');
+    expect(invoice, isNotNull);
+    expect(invoice!.customerId, 'customer-1');
+    expect(invoice.discountMinor, 1000);
+    expect(invoice.taxMinor, 3420);
+    expect(invoice.totalMinor, 22420);
+    expect(invoice.paymentMethod, 'upi');
+    expect((await db.select(db.syncQueue).get()).length, 2);
+  });
+
   test('insufficient stock rolls back invoice and stock changes', () async {
     final item = await seedItem(stock: 2);
 
