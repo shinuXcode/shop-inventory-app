@@ -215,6 +215,21 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  Future<List<SyncQueueData>> pendingSyncQueue({int limit = 50}) => (select(syncQueue)
+    ..orderBy([(t) => OrderingTerm(expression: t.createdAt)])
+    ..limit(limit)).get();
+
+  Future<void> deleteSyncQueueEntry(int id) =>
+      (delete(syncQueue)..where((t) => t.id.equals(id))).go();
+
+  Future<void> failSyncQueueEntry(int id, String error) =>
+      (update(syncQueue)..where((t) => t.id.equals(id))).write(
+        SyncQueueCompanion(
+          attempts: const Value.absent(),
+          lastError: Value(error),
+        ),
+      );
+
   Future<List<Invoice>> recentInvoices({int limit = 30}) => (select(invoices)
     ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])..limit(limit)).get();
 }
