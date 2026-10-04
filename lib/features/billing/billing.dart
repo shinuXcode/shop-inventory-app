@@ -361,11 +361,11 @@ class _BillingPageState extends ConsumerState<BillingPage> {
                   decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search customers'),
                 ),
                 const SizedBox(height: 12),
-                Flexible(
+                SizedBox(
+                  height: 320,
                   child: visible.isEmpty
-                    ? const Padding(padding: EdgeInsets.all(20), child: Text('No matching customers.'))
+                    ? const Center(child: Text('No matching customers.'))
                     : ListView.builder(
-                        shrinkWrap: true,
                         itemCount: visible.length,
                         itemBuilder: (_, i) => ListTile(
                           leading: const Icon(Icons.person_outline),
