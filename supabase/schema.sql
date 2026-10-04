@@ -1,32 +1,168 @@
 create extension if not exists pgcrypto;
 
+create table if not exists public.businesses (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  phone text,
+  email text,
+  address text,
+  gst_number text,
+  currency text not null default 'INR',
+  invoice_prefix text not null default 'INV',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.business_members (
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null default 'owner' check (role in ('owner','manager','cashier')),
+  created_at timestamptz not null default now(),
+  primary key (business_id, user_id)
+);
+
 create table if not exists public.items (
-  id text primary key, sku text, name text not null, description text,
-  price_minor bigint not null, cost_minor bigint not null default 0,
-  tax_rate numeric not null default 0, stock_quantity integer not null default 0,
-  low_stock_threshold integer not null default 5, category text, barcode text,
-  is_active boolean not null default true, created_at timestamptz not null,
-  updated_at timestamptz not null, user_id uuid not null default auth.uid()
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  sku text not null,
+  name text not null,
+  description text,
+  barcode text,
+  price_minor bigint not null default 0,
+  cost_minor bigint not null default 0,
+  tax_rate numeric(6,3) not null default 0,
+  stock_quantity numeric(14,3) not null default 0,
+  low_stock_threshold numeric(14,3) not null default 0,
+  category text,
+  is_active boolean not null default true,
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  unique (business_id, sku)
 );
+
 create table if not exists public.customers (
-  id text primary key, name text not null, phone text, email text, address text, notes text,
-  created_at timestamptz not null, updated_at timestamptz not null,
-  user_id uuid not null default auth.uid()
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  name text not null,
+  phone text,
+  email text,
+  address text,
+  notes text,
+  created_at timestamptz not null,
+  updated_at timestamptz not null
 );
+
 create table if not exists public.invoices (
-  id text primary key, invoice_number text not null, customer_id text,
-  subtotal_minor bigint not null, discount_minor bigint not null default 0,
-  tax_minor bigint not null default 0, total_minor bigint not null,
-  payment_method text not null, status text not null default 'completed', notes text,
-  created_at timestamptz not null, updated_at timestamptz not null,
-  user_id uuid not null default auth.uid()
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  invoice_number text not null,
+  customer_id uuid references public.customers(id) on delete set null,
+  subtotal_minor bigint not null,
+  discount_minor bigint not null default 0,
+  tax_minor bigint not null default 0,
+  total_minor bigint not null,
+  payment_method text not null,
+  status text not null default 'paid',
+  notes text,
+  created_at timestamptz not null,
+  updated_at timestamptz not null,
+  unique (business_id, invoice_number)
 );
+
+create table if not exists public.invoice_items (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  invoice_id uuid not null references public.invoices(id) on delete cascade,
+  item_id uuid references public.items(id) on delete set null,
+  item_name_snapshot text not null,
+  sku_snapshot text not null,
+  quantity numeric(14,3) not null,
+  unit_price_minor bigint not null,
+  tax_rate numeric(6,3) not null,
+  tax_minor bigint not null,
+  line_total_minor bigint not null
+);
+
+create table if not exists public.sync_events (
+  id uuid primary key default gen_random_uuid(),
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  entity_type text not null,
+  entity_id uuid not null,
+  operation text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists items_business_idx on public.items(business_id);
+create index if not exists items_barcode_idx on public.items(business_id, barcode);
+create index if not exists items_name_idx on public.items(business_id, name);
+create index if not exists customers_business_idx on public.customers(business_id);
+create index if not exists invoices_business_date_idx on public.invoices(business_id, created_at desc);
+create index if not exists invoice_items_invoice_idx on public.invoice_items(invoice_id);
+
+alter table public.businesses enable row level security;
+alter table public.business_members enable row level security;
 alter table public.items enable row level security;
 alter table public.customers enable row level security;
 alter table public.invoices enable row level security;
-create policy "users manage own items" on public.items for all
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy "users manage own customers" on public.customers for all
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
-create policy "users manage own invoices" on public.invoices for all
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
+alter table public.invoice_items enable row level security;
+alter table public.sync_events enable row level security;
+
+create or replace function public.is_business_member(target_business uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.business_members
+    where business_id = target_business and user_id = auth.uid()
+  );
+$$;
+
+create or replace function public.is_business_manager(target_business uuid)
+returns boolean language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.business_members
+    where business_id = target_business
+      and user_id = auth.uid()
+      and role in ('owner','manager')
+  );
+$$;
+
+drop policy if exists "members can read businesses" on public.businesses;
+create policy "members can read businesses" on public.businesses for select using (public.is_business_member(id));
+drop policy if exists "managers can update businesses" on public.businesses;
+create policy "managers can update businesses" on public.businesses for update using (public.is_business_manager(id)) with check (public.is_business_manager(id));
+
+drop policy if exists "users can read memberships" on public.business_members;
+create policy "users can read memberships" on public.business_members for select using (user_id = auth.uid() or public.is_business_manager(business_id));
+
+drop policy if exists "members can read items" on public.items;
+create policy "members can read items" on public.items for select using (public.is_business_member(business_id));
+drop policy if exists "members can insert items" on public.items;
+create policy "members can insert items" on public.items for insert with check (public.is_business_member(business_id));
+drop policy if exists "members can update items" on public.items;
+create policy "members can update items" on public.items for update using (public.is_business_member(business_id)) with check (public.is_business_member(business_id));
+
+drop policy if exists "members can read customers" on public.customers;
+create policy "members can read customers" on public.customers for select using (public.is_business_member(business_id));
+drop policy if exists "members can insert customers" on public.customers;
+create policy "members can insert customers" on public.customers for insert with check (public.is_business_member(business_id));
+drop policy if exists "members can update customers" on public.customers;
+create policy "members can update customers" on public.customers for update using (public.is_business_member(business_id)) with check (public.is_business_member(business_id));
+
+drop policy if exists "members can read invoices" on public.invoices;
+create policy "members can read invoices" on public.invoices for select using (public.is_business_member(business_id));
+drop policy if exists "members can insert invoices" on public.invoices;
+create policy "members can insert invoices" on public.invoices for insert with check (public.is_business_member(business_id));
+drop policy if exists "managers can update invoices" on public.invoices;
+create policy "managers can update invoices" on public.invoices for update using (public.is_business_manager(business_id)) with check (public.is_business_manager(business_id));
+
+drop policy if exists "members can read invoice items" on public.invoice_items;
+create policy "members can read invoice items" on public.invoice_items for select using (public.is_business_member(business_id));
+drop policy if exists "members can insert invoice items" on public.invoice_items;
+create policy "members can insert invoice items" on public.invoice_items for insert with check (
+  public.is_business_member(business_id)
+  and exists (select 1 from public.invoices i where i.id = invoice_id and i.business_id = business_id)
+);
+
+drop policy if exists "members can read sync events" on public.sync_events;
+create policy "members can read sync events" on public.sync_events for select using (public.is_business_member(business_id));
+drop policy if exists "members can insert sync events" on public.sync_events;
+create policy "members can insert sync events" on public.sync_events for insert with check (public.is_business_member(business_id));
