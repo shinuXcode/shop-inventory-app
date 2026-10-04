@@ -105,7 +105,44 @@ class AppDatabase extends _$AppDatabase {
       entityType: 'item', entityId: item.id.value, operation: 'upsert', createdAt: DateTime.now()));
   }
 
-  Future<List<Customer>> getCustomers() => select(customers).get();
+  Future<List<Customer>> getCustomers({String query = ''}) {
+    final q = '%' + query.trim() + '%';
+    final stmt = select(customers)..orderBy([(t) => OrderingTerm(expression: t.name)]);
+    if (query.trim().isNotEmpty) {
+      stmt.where((t) => t.name.like(q) | t.phone.like(q) | t.email.like(q));
+    }
+    return stmt.get();
+  }
+
+  Future<Customer?> customerById(String id) =>
+      (select(customers)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<Invoice?> invoiceById(String id) =>
+      (select(invoices)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  Future<List<InvoiceItem>> invoiceItemsFor(String invoiceId) =>
+      (select(invoiceItems)..where((t) => t.invoiceId.equals(invoiceId))).get();
+
+  Future<List<Invoice>> invoicesForCustomer(String customerId) => (select(invoices)
+    ..where((t) => t.customerId.equals(customerId))
+    ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
+
+  Future<int> todaySalesMinor() async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final rows = await (select(invoices)..where((t) => t.createdAt.isBiggerOrEqualValue(start))).get();
+    return rows.fold<int>(0, (sum, row) => sum + row.totalMinor);
+  }
+
+  Future<int> todayInvoiceCount() async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final rows = await (select(invoices)..where((t) => t.createdAt.isBiggerOrEqualValue(start))).get();
+    return rows.length;
+  }
+
+  Future<int> lowStockCount() => (select(items)..where((t) =>
+      t.isActive.equals(true) & t.stockQuantity.isSmallerOrEqual(t.lowStockThreshold))).get().then((r) => r.length);
 
   Future<void> saveCustomer(CustomersCompanion customer) async {
     await into(customers).insertOnConflictUpdate(customer);
@@ -121,37 +158,58 @@ class AppDatabase extends _$AppDatabase {
     required int discountMinor,
     required String paymentMethod,
   }) async {
+    if (cart.isEmpty) throw ArgumentError('Cart is empty.');
+    if (paymentMethod.trim().isEmpty) throw ArgumentError('Payment method is required.');
+
+    final calculator = const BillingCalculator();
+    final totals = calculator.calculate(
+      lines: cart.map((line) => BillingLine(
+        unitPriceMinor: line.item.priceMinor,
+        quantity: line.quantity,
+        taxRateBps: (line.item.taxRate * 100).round(),
+      )).toList(),
+      discountMinor: discountMinor,
+    );
+
     await transaction(() async {
-      final subtotal = cart.fold<int>(0, (s, l) => s + l.item.priceMinor * l.quantity);
-      final tax = cart.fold<int>(0, (s, l) =>
-        s + ((l.item.priceMinor * l.quantity * l.item.taxRate) / 100).round());
-      final total = subtotal + tax - discountMinor;
       final now = DateTime.now();
-
-      await into(invoices).insert(InvoicesCompanion.insert(
-        id: invoiceId, invoiceNumber: invoiceNumber, customerId: Value(customerId),
-        subtotalMinor: subtotal, discountMinor: Value(discountMinor),
-        taxMinor: Value(tax), totalMinor: total, paymentMethod: paymentMethod,
-        createdAt: now, updatedAt: now));
-
       for (final line in cart) {
+        if (line.quantity <= 0) throw ArgumentError('Quantity must be positive.');
         if (line.quantity > line.item.stockQuantity) {
           throw StateError('Insufficient stock for ' + line.item.name);
         }
-        final lineTax = ((line.item.priceMinor * line.quantity * line.item.taxRate) / 100).round();
+      }
+
+      await into(invoices).insert(InvoicesCompanion.insert(
+        id: invoiceId, invoiceNumber: invoiceNumber, customerId: Value(customerId),
+        subtotalMinor: totals.subtotalMinor, discountMinor: Value(totals.discountMinor),
+        taxMinor: Value(totals.taxMinor), totalMinor: totals.totalMinor,
+        paymentMethod: paymentMethod, createdAt: now, updatedAt: now));
+
+      for (final line in cart) {
+        final lineSubtotal = line.item.priceMinor * line.quantity;
+        final lineDiscount = totals.subtotalMinor == 0 ? 0 :
+            ((lineSubtotal * discountMinor) / totals.subtotalMinor).round();
+        final lineTax = calculator.taxFor(
+          lineSubtotal - lineDiscount,
+          (line.item.taxRate * 100).round(),
+        );
         await into(invoiceItems).insert(InvoiceItemsCompanion.insert(
           id: line.id, invoiceId: invoiceId, itemId: line.item.id,
           itemNameSnapshot: line.item.name, skuSnapshot: Value(line.item.sku),
           quantity: line.quantity, unitPriceMinor: line.item.priceMinor,
           taxRate: line.item.taxRate, taxMinor: lineTax,
-          lineTotalMinor: line.item.priceMinor * line.quantity + lineTax));
+          lineTotalMinor: lineSubtotal - lineDiscount + lineTax));
+
         await (update(items)..where((t) => t.id.equals(line.item.id))).write(
           ItemsCompanion(
             stockQuantity: Value(line.item.stockQuantity - line.quantity),
             updatedAt: Value(now),
             syncStatus: const Value('pending'),
-          ));
+          ),
+        );
       }
+
       await into(syncQueue).insert(SyncQueueCompanion.insert(
         entityType: 'invoice', entityId: invoiceId, operation: 'upsert', createdAt: now));
     });
