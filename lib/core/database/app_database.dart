@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import '../billing/billing_calculator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 part 'app_database.g.dart';
@@ -36,7 +37,7 @@ class Customers extends Table {
   DateTimeColumn get updatedAt => dateTime()();
   TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
   DateTimeColumn get lastSyncedAt => dateTime().nullable()();
-  @override String get primaryKey => 'id';
+  @override Set<Column<Object>> get primaryKey => {id};
 }
 
 class Invoices extends Table {
