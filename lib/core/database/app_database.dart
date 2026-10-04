@@ -222,10 +222,10 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteSyncQueueEntry(int id) =>
       (delete(syncQueue)..where((t) => t.id.equals(id))).go();
 
-  Future<void> failSyncQueueEntry(int id, String error) =>
+  Future<void> failSyncQueueEntry(int id, int attempts, String error) =>
       (update(syncQueue)..where((t) => t.id.equals(id))).write(
         SyncQueueCompanion(
-          attempts: const Value.absent(),
+          attempts: Value(attempts + 1),
           lastError: Value(error),
         ),
       );
