@@ -219,6 +219,8 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  Future<int> pendingSyncCount() => select(syncQueue).get().then((r) => r.length);
+
   Future<List<SyncQueueData>> pendingSyncQueue({int limit = 50}) => (select(syncQueue)
     ..orderBy([(t) => OrderingTerm(expression: t.createdAt)])
     ..limit(limit)).get();
