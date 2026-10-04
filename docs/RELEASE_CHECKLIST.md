@@ -8,17 +8,18 @@
 - [x] Phase 5 deterministic integer billing calculator
 - [x] Phase 11 persistent local settings foundation
 - [x] Supabase multi-tenant schema/RLS foundation
-- [ ] Full authentication/workspace onboarding
-- [ ] Cloud synchronization and conflict resolution
-- [ ] Thermal receipt generation
-- [ ] Complete customer history/edit flow
-- [ ] Full invoice detail/print/share/download flow
-- [ ] Analytics expansion
-- [ ] Desktop keyboard shortcuts
-- [ ] Full website/showcase validation
-- [ ] Android release build
-- [ ] Windows release build
-- [ ] macOS release build where supported
+- [x] Supabase email authentication and workspace bootstrap
+- [x] Cloud synchronization with persisted retry queue and idempotent entity upserts
+- [ ] Multi-device pull/conflict UI
+- [x] Thermal receipt PDF generation
+- [x] Complete customer history/edit flow
+- [x] Full invoice detail/print/share/save flow
+- [x] Dashboard analytics expansion
+- [x] Billing desktop keyboard shortcuts
+- [x] Responsive showcase website content and static validation
+- [ ] Android release artifact verified in CI
+- [ ] Windows release artifact verified in CI
+- [ ] macOS release artifact verified in CI
 
 ## Mandatory release gate
 Run:
