@@ -22,7 +22,8 @@ class ThemeModeController extends Notifier<ThemeMode> {
   @override
   ThemeMode build() {
     final prefs = ref.read(sharedPreferencesProvider);
-    return prefs.getBool('darkMode') == true ? ThemeMode.dark : ThemeMode.system;
+    if (!prefs.containsKey('darkMode')) return ThemeMode.system;
+    return prefs.getBool('darkMode') == true ? ThemeMode.dark : ThemeMode.light;
   }
 
   Future<void> setDarkMode(bool enabled) async {
