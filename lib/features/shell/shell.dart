@@ -43,6 +43,7 @@ class _ShellState extends State<Shell> {
       bottomNavigationBar: wide ? null : NavigationBar(
         selectedIndex: index,
         onDestinationSelected: (v) => setState(() => index = v),
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         destinations: List.generate(labels.length, (i) =>
           NavigationDestination(icon: Icon(icons[i]), label: labels[i])),
       ),
