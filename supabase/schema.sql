@@ -162,6 +162,12 @@ create policy "members can insert invoice items" on public.invoice_items for ins
   and exists (select 1 from public.invoices i where i.id = invoice_id and i.business_id = business_id)
 );
 
+drop policy if exists "members can update invoice items" on public.invoice_items;
+create policy "members can update invoice items" on public.invoice_items for update using (public.is_business_member(business_id)) with check (
+  public.is_business_member(business_id)
+  and exists (select 1 from public.invoices i where i.id = invoice_id and i.business_id = business_id)
+);
+
 drop policy if exists "members can read sync events" on public.sync_events;
 create policy "members can read sync events" on public.sync_events for select using (public.is_business_member(business_id));
 drop policy if exists "members can insert sync events" on public.sync_events;
