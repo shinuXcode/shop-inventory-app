@@ -69,7 +69,7 @@ class InvoiceItems extends Table {
   RealColumn get taxRate => real()();
   IntColumn get taxMinor => integer()();
   IntColumn get lineTotalMinor => integer()();
-  @override String get primaryKey => 'id';
+  @override Set<Column<Object>> get primaryKey => {id};
 }
 
 class SyncQueue extends Table {
