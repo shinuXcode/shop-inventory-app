@@ -166,3 +166,41 @@ drop policy if exists "members can read sync events" on public.sync_events;
 create policy "members can read sync events" on public.sync_events for select using (public.is_business_member(business_id));
 drop policy if exists "members can insert sync events" on public.sync_events;
 create policy "members can insert sync events" on public.sync_events for insert with check (public.is_business_member(business_id));
+
+
+create or replace function public.create_business(
+  p_name text,
+  p_phone text default null,
+  p_address text default null,
+  p_gst_number text default null,
+  p_currency text default 'INR',
+  p_invoice_prefix text default 'INV'
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_business uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+  if nullif(trim(p_name), '') is null then
+    raise exception 'Business name is required';
+  end if;
+
+  insert into public.businesses(name, phone, address, gst_number, currency, invoice_prefix)
+  values (trim(p_name), p_phone, p_address, p_gst_number, coalesce(nullif(trim(p_currency), ''), 'INR'),
+          coalesce(nullif(trim(p_invoice_prefix), ''), 'INV'))
+  returning id into new_business;
+
+  insert into public.business_members(business_id, user_id, role)
+  values (new_business, auth.uid(), 'owner');
+
+  return new_business;
+end;
+$$;
+
+grant execute on function public.create_business(text,text,text,text,text,text) to authenticated;
