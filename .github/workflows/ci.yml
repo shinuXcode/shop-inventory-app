@@ -118,7 +118,16 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=macos,ios .
-      - run: dart run launcher_icons
+      - name: Restore launcher icon
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          from pathlib import Path
+          raw = Path("assets/icon/sbill_icon.png.b64").read_text().strip()
+          Path("assets/icon/sbill_icon.png").write_bytes(base64.b64decode(raw))
+          PY
+      - run: dart run flutter_launcher_icons
       - run: flutter build macos --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
