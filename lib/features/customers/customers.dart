@@ -123,6 +123,16 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
             const SizedBox(height: 10),
             Text('Notes: ' + customer.notes!),
           ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _stat(context, 'Invoices', stats.invoiceCount.toString(), Icons.receipt_long_outlined)),
+              const SizedBox(width: 8),
+              Expanded(child: _stat(context, 'Purchases', '₹' + (stats.totalMinor / 100).toStringAsFixed(2), Icons.shopping_bag_outlined)),
+              const SizedBox(width: 8),
+              Expanded(child: _stat(context, 'Credit', '₹' + (stats.creditMinor / 100).toStringAsFixed(2), Icons.account_balance_wallet_outlined)),
+            ],
+          ),
         ]),
         actions: [
           TextButton(onPressed: () { Navigator.pop(context); _history(customer); }, child: const Text('History')),
