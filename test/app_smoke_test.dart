@@ -21,7 +21,8 @@ void main() {
         child: const SBillApp(),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
     expect(find.text('Dashboard'), findsWidgets);
     expect(find.text('Today’s sales'), findsOneWidget);
