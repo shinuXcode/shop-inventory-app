@@ -213,9 +213,10 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     focusNode: searchFocus,
     onChanged: _search,
     textInputAction: TextInputAction.search,
+    onSubmitted: _quickBarcodeAdd,
     decoration: InputDecoration(
       prefixIcon: const Icon(Icons.search),
-      hintText: 'Search name, SKU or barcode (F2)',
+      hintText: 'Search or enter barcode / SKU (F2)',
       suffixIcon: search.text.isEmpty ? null : IconButton(
         tooltip: 'Clear',
         onPressed: () { search.clear(); _search(''); },
@@ -227,6 +228,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   Widget _productList() => results.isEmpty
     ? const Center(child: Text('No active products found.'))
     : ListView.separated(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       itemCount: results.length,
       separatorBuilder: (_, __) => const SizedBox(height: 6),
       itemBuilder: (_, i) {
