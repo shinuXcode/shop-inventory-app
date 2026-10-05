@@ -54,7 +54,7 @@ class _ShellState extends State<Shell> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final rail = width >= 900;
+    final rail = width >= 720;
     final extended = width >= 1200;
     return Scaffold(
       body: Row(children: [
