@@ -125,9 +125,8 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
               },
             );
           },
-        ),
-      ),
-    );
+        )),
+      ]);
   }
 
   Widget _empty(BuildContext c, WidgetRef r, {bool searched = false}) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
