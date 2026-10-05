@@ -13,6 +13,8 @@ concurrency:
 
 env:
   FLUTTER_VERSION: 3.47.6
+  SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+  SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
 
 jobs:
   quality:
@@ -29,8 +31,16 @@ jobs:
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
       - run: flutter create --platforms=android,windows,macos .
-      - run: flutter build apk --debug
-      - run: flutter build apk --release
+      - name: Check cloud build configuration
+        shell: bash
+        run: |
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "Supabase account/sync configuration: enabled"
+          else
+            echo "Supabase account/sync configuration: disabled for this build (repository variables are not set)."
+          fi
+      - run: flutter build apk --debug --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+      - run: flutter build apk --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - name: Verify Android APK
         shell: bash
         run: |
@@ -63,7 +73,14 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=windows .
-      - run: flutter build windows --release
+      - run: flutter build windows --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+      - name: Package Windows build
+        shell: pwsh
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath sbill-windows.zip -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbill-windows-package
+          path: sbill-windows.zip
       - uses: actions/upload-artifact@v4
         with:
           name: sbill-windows-build
@@ -81,13 +98,30 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=macos,ios .
-      - run: flutter build macos --release
+      - run: flutter build macos --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
           name: sbill-macos-build
           path: build/macos/Build/Products/Release/
-      - run: flutter build ios --no-codesign
+      - name: Package macOS app
+        shell: bash
+        run: ditto -c -k --sequesterRsrc --keepParent "build/macos/Build/Products/Release/sbill.app" sbill-macos.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbill-macos-package
+          path: sbill-macos.zip
+      - run: flutter build ios --no-codesign --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
           name: sbill-ios-build
           path: build/ios/iphoneos/
+      - name: Package iOS unsigned app
+        shell: bash
+        run: |
+          IOS_APP=$(find build/ios/iphoneos -maxdepth 1 -type d -name '*.app' | head -n 1)
+          test -n "$IOS_APP"
+          ditto -c -k --sequesterRsrc --keepParent "$IOS_APP" sbill-ios-unsigned.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbill-ios-package
+          path: sbill-ios-unsigned.zip
