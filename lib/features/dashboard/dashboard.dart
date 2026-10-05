@@ -12,15 +12,17 @@ final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) as
   final invoices = await db.recentInvoices(limit: 500);
   final lowStock = await db.lowStockCount();
   final topSellers = await db.topSellingItems(limit: 5);
-  return DashboardData(invoices: invoices, lowStock: lowStock, topSellers: topSellers);
+  final creditOutstanding = await db.creditOutstandingMinor();
+  return DashboardData(invoices: invoices, lowStock: lowStock, topSellers: topSellers, creditOutstanding: creditOutstanding);
 });
 
 class DashboardData {
-  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers});
+  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers, required this.creditOutstanding});
 
   final List<Invoice> invoices;
   final int lowStock;
   final List<TopSellingItem> topSellers;
+  final int creditOutstanding;
 }
 
 class DashboardPage extends ConsumerWidget {
@@ -112,6 +114,12 @@ class DashboardPage extends ConsumerWidget {
                         'Low-stock items',
                         lowStock.toString(),
                         Icons.inventory_2_outlined,
+                      ),
+                      _metric(
+                        context,
+                        'Credit outstanding',
+                        '₹' + (data.creditOutstanding / 100).toStringAsFixed(2),
+                        Icons.account_balance_wallet_outlined,
                       ),
                     ],
                   );
