@@ -23,6 +23,7 @@ dependencies:
   window_manager: ^0.4.3
   shared_preferences: ^2.3.2
   file_picker: ^11.0.3
+  cross_file: ^0.3.4+2
   share_plus: ^11.1.0
 dev_dependencies:
   flutter_test:
