@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../app.dart';
+import '../migration/migration.dart';
 import '../../core/database/app_database.dart';
 
 final itemsProvider = StreamProvider.autoDispose<List<Item>>(
@@ -16,7 +17,16 @@ class InventoryPage extends ConsumerWidget {
     final items = ref.watch(itemsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Inventory'), actions: [
-        IconButton(tooltip: 'Add product', onPressed: () => _edit(context, ref), icon: const Icon(Icons.add))
+        IconButton(
+          tooltip: 'Import products / switch to SBILL',
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MigrationPage())),
+          icon: const Icon(Icons.file_download_outlined),
+        ),
+        IconButton(
+          tooltip: 'Add product',
+          onPressed: () => _edit(context, ref),
+          icon: const Icon(Icons.add_box_outlined),
+        ),
       ]),
       body: items.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -37,7 +47,11 @@ class InventoryPage extends ConsumerWidget {
                     DataCell(Text(x.sku ?? '—')),
                     DataCell(Text('₹' + (x.priceMinor / 100).toStringAsFixed(2))),
                     DataCell(Text(x.stockQuantity.toString())),
-                    DataCell(Text(x.taxRate.toString() + '%')),
+                    DataCell(Row(children: [
+                      if (x.stockQuantity <= x.lowStockThreshold) const Icon(Icons.warning_amber_rounded, size: 18),
+                      if (x.stockQuantity <= x.lowStockThreshold) const SizedBox(width: 4),
+                      Text(x.taxRate.toString() + '%'),
+                    ])),
                     DataCell(Row(children: [
                       IconButton(tooltip: 'Edit product', onPressed: () => _edit(context, ref, item: x), icon: const Icon(Icons.edit_outlined)),
                       IconButton(tooltip: 'Deactivate product', onPressed: () => _deactivate(context, ref, x), icon: const Icon(Icons.archive_outlined)),
