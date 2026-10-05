@@ -18,11 +18,17 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 class SyncService {
   SyncService(this.db) {
     _subscription = Connectivity().onConnectivityChanged.listen(_onConnectivity);
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => syncNow());
+    if (CloudConfig.configured) {
+      _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+        unawaited(syncNow());
+      });
+    }
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(syncNow()));
   }
 
   final AppDatabase db;
   late final StreamSubscription<List<ConnectivityResult>> _subscription;
+  StreamSubscription<AuthState>? _authSubscription;
   late final Timer _timer;
   bool syncing = false;
   String? lastError;
@@ -321,6 +327,7 @@ class SyncService {
 
   void dispose() {
     _subscription.cancel();
+    _authSubscription?.cancel();
     _timer.cancel();
   }
 }
