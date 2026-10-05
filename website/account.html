@@ -20,6 +20,10 @@
 </form>
 <div id="accountCard" class="hidden">
 <div class="account-summary"><div><b id="accountEmail"></b><span id="workspaceName" class="muted"></span></div><button class="secondary" id="signout" type="button">Sign out</button></div>
+<div id="workspaceCreator" class="portal-state hidden">
+<b>Create or connect a workspace</b><p class="muted">No business is linked to this account yet. Create one here and it will also appear in the SBILL app.</p>
+<div class="actions"><input id="businessName" placeholder="Business name" aria-label="Business name"><button class="primary" id="createWorkspace" type="button">Create workspace</button></div>
+</div>
 <div class="portal-grid">
 <a class="portal-tile" href="support.html"><b>Support</b><span>Create and track support requests using this account.</span></a>
 <a class="portal-tile" href="index.html#download"><b>Downloads</b><span>Choose platform builds published by the release pipeline.</span></a>
@@ -40,6 +44,7 @@ async function refresh(){
     document.getElementById('accountEmail').textContent=user.email||'SBILL account';
     const workspace=await getWorkspace();
     document.getElementById('workspaceName').textContent=workspace?('Workspace: '+workspace.name):'No workspace linked yet';
+    document.getElementById('workspaceCreator').classList.toggle('hidden', !!workspace);
     note('Signed in.');
   }else{
     form.classList.remove('hidden');card.classList.add('hidden');note('Sign in to use the same account as the SBILL app.');
@@ -56,6 +61,12 @@ document.getElementById('signup').onclick=async()=>{
 document.getElementById('reset').onclick=async()=>{
   const supabase=await getSupabase(); if(!supabase){note('Cloud account is not configured.');return;}
   try{await supabase.auth.resetPasswordForEmail(email.value.trim());note('Password reset email sent.');}catch(err){note(err.message||String(err));}
+};
+document.getElementById('createWorkspace').onclick=async()=>{
+  const supabase=await getSupabase(); const name=document.getElementById('businessName').value.trim();
+  if(!supabase || !name){note('Enter a business name.');return;}
+  try{await supabase.rpc('create_business',{p_name:name,p_phone:null,p_address:null,p_gst_number:null,p_currency:'INR',p_invoice_prefix:'INV'});note('Workspace created.');await refresh();}
+  catch(err){note(err.message||String(err));}
 };
 document.getElementById('signout').onclick=async()=>{const supabase=await getSupabase();await supabase?.auth.signOut();await refresh();};
 refresh();
