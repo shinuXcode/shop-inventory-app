@@ -9,11 +9,25 @@ import '../../core/database/app_database.dart';
 final itemsProvider = StreamProvider.autoDispose<List<Item>>(
   (ref) => ref.watch(databaseProvider).watchActiveItems());
 
-class InventoryPage extends ConsumerWidget {
+class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InventoryPage> createState() => _InventoryPageState();
+}
+
+class _InventoryPageState extends ConsumerState<InventoryPage> {
+  final search = TextEditingController();
+
+  @override
+  void dispose() {
+    search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final items = ref.watch(itemsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Inventory'), actions: [
@@ -31,18 +45,43 @@ class InventoryPage extends ConsumerWidget {
       body: items.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Could not load inventory: $e')),
-        data: (list) => list.isEmpty ? _empty(context, ref) : LayoutBuilder(
+        data: (list) {
+          final query = search.text.trim().toLowerCase();
+          final filtered = query.isEmpty ? list : list.where((x) =>
+            x.name.toLowerCase().contains(query) ||
+            (x.sku ?? '').toLowerCase().contains(query) ||
+            (x.barcode ?? '').toLowerCase().contains(query) ||
+            (x.category ?? '').toLowerCase().contains(query)
+          ).toList();
+          return Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: TextField(
+                controller: search,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Search product, SKU, barcode or category',
+                  suffixIcon: search.text.isEmpty ? null : IconButton(
+                    tooltip: 'Clear search',
+                    onPressed: () { search.clear(); setState(() {}); },
+                    icon: const Icon(Icons.close),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(child: filtered.isEmpty ? _empty(context, ref, searched: query.isNotEmpty) : LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth >= 1100) {
               return SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: DataTable(
                   columns: const [
                     DataColumn(label: Text('Product')), DataColumn(label: Text('SKU')),
                     DataColumn(label: Text('Price')), DataColumn(label: Text('Stock')),
                     DataColumn(label: Text('Tax')), DataColumn(label: Text('Actions')),
                   ],
-                  rows: list.map((x) => DataRow(cells: [
+                  rows: filtered.map((x) => DataRow(cells: [
                     DataCell(Text(x.name)),
                     DataCell(Text(x.sku ?? '—')),
                     DataCell(Text('₹' + (x.priceMinor / 100).toStringAsFixed(2))),
@@ -61,10 +100,10 @@ class InventoryPage extends ConsumerWidget {
               );
             }
             return ListView.separated(
-              padding: const EdgeInsets.all(16), itemCount: list.length,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), itemCount: filtered.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (_, i) {
-                final x = list[i];
+                final x = filtered[i];
                 final low = x.stockQuantity <= x.lowStockThreshold;
                 return Card(child: ListTile(
                   leading: CircleAvatar(child: Text(x.name.isEmpty ? '?' : x.name[0].toUpperCase())),
@@ -91,9 +130,9 @@ class InventoryPage extends ConsumerWidget {
     );
   }
 
-  Widget _empty(BuildContext c, WidgetRef r) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+  Widget _empty(BuildContext c, WidgetRef r, {bool searched = false}) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
     const Icon(Icons.inventory_2_outlined, size: 56), const SizedBox(height: 12),
-    const Text('No active products'), const SizedBox(height: 12),
+    Text(searched ? 'No products match your search' : 'No active products'), const SizedBox(height: 12),
     FilledButton.icon(onPressed: () => _edit(c, r), icon: const Icon(Icons.add), label: const Text('Add product')),
   ]));
 
