@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../app.dart';
+import '../../core/database/app_database.dart';
 import '../migration/migration.dart';
 import '../shell/shell.dart';
 
