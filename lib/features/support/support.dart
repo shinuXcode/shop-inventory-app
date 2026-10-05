@@ -96,10 +96,7 @@ class _SupportPageState extends State<SupportPage> {
   Future<void> _close(String id) async {
     if (!configured || client.auth.currentUser == null) return;
     try {
-      await client.from('support_tickets').update({
-        'status': 'closed',
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', id).eq('user_id', client.auth.currentUser!.id);
+      await client.rpc('close_support_ticket', params: {'p_ticket_id': id});
       await _loadTickets();
     } catch (e) {
       _message('Could not close ticket: $e');
