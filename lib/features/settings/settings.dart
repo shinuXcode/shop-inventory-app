@@ -7,6 +7,7 @@ import '../../core/cloud/cloud_config.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/sync/sync_service.dart';
 import '../migration/migration.dart';
+import '../account/account.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -296,51 +297,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
           ),
           const SizedBox(height: 24),
-          Text('Cloud & Sync', style: Theme.of(context).textTheme.titleLarge),
+          Text('Account & Sync', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    _signedIn ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
-                  ),
-                  title: Text(_cloudUserEmail),
-                  subtitle: Text(
-                    settings.businessId == null
-                      ? 'No workspace selected'
-                      : 'Workspace: ' + settings.businessId!,
-                  ),
-                ),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  if (!_signedIn)
-                    OutlinedButton.icon(
-                      onPressed: _cloudAuth,
-                      icon: const Icon(Icons.login_outlined),
-                      label: const Text('Sign in / Sign up'),
-                    ),
-                  if (_signedIn && settings.businessId == null)
-                    FilledButton.tonalIcon(
-                      onPressed: _createBusiness,
-                      icon: const Icon(Icons.business_outlined),
-                      label: const Text('Create workspace'),
-                    ),
-                  if (_signedIn && settings.businessId != null)
-                    FilledButton.tonalIcon(
-                      onPressed: _syncNow,
-                      icon: const Icon(Icons.sync_outlined),
-                      label: const Text('Sync now'),
-                    ),
-                  if (_signedIn)
-                    TextButton.icon(
-                      onPressed: _signOut,
-                      icon: const Icon(Icons.logout_outlined),
-                      label: const Text('Sign out'),
-                    ),
-                ]),
-              ]),
+            child: ListTile(
+              leading: Icon(
+                _signedIn ? Icons.cloud_done_outlined : Icons.account_circle_outlined,
+              ),
+              title: Text(_signedIn ? _cloudUserEmail : 'SBILL account'),
+              subtitle: Text(
+                settings.businessId == null
+                    ? 'Sign in or create an account to sync across devices.'
+                    : 'Cloud workspace linked. Open Account Center to manage sync.',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AccountPage()),
+                );
+                if (mounted) setState(() {});
+              },
             ),
           ),
           const SizedBox(height: 10),
