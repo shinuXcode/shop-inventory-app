@@ -6,6 +6,7 @@ import '../../app.dart';
 import '../../core/cloud/cloud_config.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/sync/sync_service.dart';
+import '../migration/migration.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -21,6 +22,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final address = TextEditingController();
   final gst = TextEditingController();
   final prefix = TextEditingController();
+  final invoiceFooter = TextEditingController();
   bool thermal = false;
   bool dark = false;
   bool loading = true;
@@ -40,6 +42,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     address.text = settings.businessAddress;
     gst.text = settings.gstNumber;
     prefix.text = settings.invoicePrefix;
+    invoiceFooter.text = settings.invoiceFooter;
     thermal = settings.thermalReceipt;
     dark = settings.darkMode;
     if (mounted) setState(() => loading = false);
@@ -55,6 +58,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       invoicePrefix: prefix.text.trim().isEmpty ? 'INV' : prefix.text.trim(),
       thermalReceipt: thermal,
       darkMode: dark,
+      invoiceFooter: invoiceFooter.text.trim(),
     );
     await ref.read(themeModeProvider.notifier).setDarkMode(dark);
     if (mounted) {
@@ -257,6 +261,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           TextField(controller: gst, decoration: const InputDecoration(labelText: 'GST number')),
           const SizedBox(height: 10),
           TextField(controller: prefix, decoration: const InputDecoration(labelText: 'Invoice prefix')),
+          const SizedBox(height: 10),
+          TextField(
+            controller: invoiceFooter,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Invoice footer',
+              hintText: 'Thank you for your business.',
+              prefixIcon: Icon(Icons.notes_outlined),
+            ),
+          ),
           const SizedBox(height: 18),
           SwitchListTile(
             title: const Text('Thermal receipt default'),
@@ -271,6 +285,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           const SizedBox(height: 12),
           FilledButton.icon(onPressed: _save, icon: const Icon(Icons.save_outlined), label: const Text('Save settings')),
+          const SizedBox(height: 18),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.move_to_inbox_outlined),
+              title: const Text('Switch to SBILL / Migration Center'),
+              subtitle: const Text('Import products and customers, or restore a complete SBILL backup.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MigrationPage())),
+            ),
+          ),
           const SizedBox(height: 24),
           Text('Cloud & Sync', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
@@ -343,6 +367,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     address.dispose();
     gst.dispose();
     prefix.dispose();
+    invoiceFooter.dispose();
     super.dispose();
   }
 }
