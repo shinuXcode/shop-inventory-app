@@ -160,7 +160,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: dart run build_runner build
-      - run: flutter create --platforms=windows .
+      - run: flutter create --platforms=android,windows .
       - name: Generate launcher icon PNG
         shell: bash
         run: |
@@ -275,7 +275,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: dart run build_runner build
-      - run: flutter create --platforms=macos .
+      - run: flutter create --platforms=android,macos .
       - name: Generate launcher icon PNG
         shell: bash
         run: |
@@ -390,7 +390,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: dart run build_runner build
-      - run: flutter create --platforms=ios .
+      - run: flutter create --platforms=android,ios .
       - name: Generate launcher icon PNG
         shell: bash
         run: |
