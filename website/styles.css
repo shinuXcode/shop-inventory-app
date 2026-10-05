@@ -18,3 +18,20 @@ footer{text-align:center;padding:36px;color:var(--muted);border-top:1px solid va
 @media(max-width:900px){nav{display:none}.hero,.split{grid-template-columns:1fr;gap:40px}.hero{min-height:auto;padding-top:72px}.grid,.platform-grid{grid-template-columns:1fr 1fr}.steps{grid-template-columns:1fr 1fr}.device{transform:none}}
 @media(max-width:600px){.section{padding:72px 6vw}.grid,.steps,.trust-grid,.device-stats,.platform-grid{grid-template-columns:1fr}.device-panel{display:block}.device-panel a{display:block;text-align:center;margin-top:14px}h1{font-size:50px}.founder-card{padding:28px}}
 .logo-mark svg{width:72%;height:72%;display:block}.os-icon{flex:none}.os-letter{font-weight:900}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+.primary,.secondary,.link-button,.portal-tile,.grid article,.platform-grid article,.ticket,.account-summary{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background-color .2s ease}
+.primary:hover,.secondary:hover,.portal-tile:hover{transform:translateY(-2px)}
+.grid article:hover,.platform-grid article:hover,.ticket:hover{transform:translateY(-2px);box-shadow:0 14px 36px #0f172a12}
+.primary:focus-visible,.secondary:focus-visible,.link-button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #93c5fd;outline-offset:3px}
+.account-teaser{background:linear-gradient(180deg,#eff6ff,transparent 80%);border-top:1px solid var(--line)}
+.logo-mark{padding:0;overflow:hidden}.logo-mark svg{width:100%;height:100%;display:block}
+.portal-page{min-height:calc(100vh - 72px);display:flex;align-items:center}.portal-card{width:min(880px,100%);margin:auto;background:#fff;border:1px solid var(--line);border-radius:28px;padding:clamp(24px,5vw,48px);box-shadow:0 24px 80px #0f172a12}
+.portal-title{font-size:clamp(38px,6vw,64px);margin:10px 0 18px}.portal-state{padding:14px 16px;background:#f8fafc;border:1px solid var(--line);border-radius:14px;color:var(--muted);margin:18px 0}
+.portal-form{display:grid;gap:14px;margin-top:18px}.portal-form label{display:grid;gap:7px;font-weight:750;color:#334155}
+.portal-form input,.portal-form select,.portal-form textarea{width:100%;border:1px solid #cbd5e1;border-radius:13px;padding:13px 14px;background:#fff;color:var(--ink);resize:vertical}
+.link-button{border:0;background:transparent;color:var(--blue);font-weight:800;padding:8px 0;justify-self:start}.hidden{display:none!important}
+.account-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;border:1px solid var(--line);border-radius:16px;background:#f8fafc}.account-summary b,.account-summary span{display:block}.account-summary span{margin-top:4px}
+.portal-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.portal-tile{display:grid;gap:7px;padding:20px;border:1px solid var(--line);border-radius:18px;text-decoration:none;background:#fff}.portal-tile span{color:var(--muted);line-height:1.55}
+.ticket{margin-top:12px;padding:18px;border:1px solid var(--line);border-radius:16px;background:#fff}.ticket-head{display:flex;justify-content:space-between;gap:14px;align-items:center}.ticket-head span{text-transform:uppercase;font-size:11px;font-weight:900;color:var(--blue);letter-spacing:.08em}.ticket p{color:var(--muted);line-height:1.6}.ticket-reply{margin-top:14px;padding:14px;border-radius:13px;background:#eff6ff}
+@media(max-width:900px){.hero-brand{margin-top:10px}.portal-page{align-items:flex-start;padding-top:60px}.portal-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.nav{padding:0 5vw}.section{padding:64px 5vw}.actions{width:100%}.actions .primary,.actions .secondary{flex:1 1 100%}.portal-card{padding:24px 18px}.ticket-head{align-items:flex-start;flex-direction:column}.logo-mark.large{width:58px;height:58px}}
