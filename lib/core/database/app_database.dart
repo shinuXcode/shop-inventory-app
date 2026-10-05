@@ -565,7 +565,10 @@ class AppDatabase extends _$AppDatabase {
     return text == null ? null : DateTime.tryParse(text);
   }
 
-$marker
+  Future<List<Invoice>> recentInvoices({int limit = 30}) => (select(invoices)
+    ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+    ..limit(limit))
+    .get();
 }
 
 class CartLine {
