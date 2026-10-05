@@ -17,6 +17,7 @@ class InvoicePdfService {
     String? shopAddress,
     String? phone,
     String? gstNumber,
+    String? footerText,
     bool thermal = false,
   }) async {
     final doc = pw.Document();
@@ -32,8 +33,8 @@ class InvoicePdfService {
       pw.Page(
         pageFormat: pageFormat,
         build: (context) => thermal
-            ? _thermalPage(invoice, items, shopName, shopAddress, phone, gstNumber)
-            : _a4Page(invoice, items, shopName, shopAddress, phone, gstNumber),
+            ? _thermalPage(invoice, items, shopName, shopAddress, phone, gstNumber, footerText)
+            : _a4Page(invoice, items, shopName, shopAddress, phone, gstNumber, footerText),
       ),
     );
     return doc.save();
@@ -46,6 +47,7 @@ class InvoicePdfService {
     String? shopAddress,
     String? phone,
     String? gstNumber,
+    String? footerText,
   ) => pw.Padding(
     padding: const pw.EdgeInsets.all(28),
     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
@@ -89,7 +91,7 @@ class InvoicePdfService {
         ]),
       ),
       pw.Spacer(),
-      pw.Center(child: pw.Text('Thank you for your business.')),
+      pw.Center(child: pw.Text((footerText ?? '').trim().isEmpty ? 'Thank you for your business.' : footerText!.trim())),
     ]),
   );
 
@@ -100,6 +102,7 @@ class InvoicePdfService {
     String? shopAddress,
     String? phone,
     String? gstNumber,
+    String? footerText,
   ) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
     pw.Text(shopName, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
     if ((shopAddress ?? '').isNotEmpty) pw.Text(shopAddress!, textAlign: pw.TextAlign.center),
@@ -136,7 +139,7 @@ class InvoicePdfService {
     pw.SizedBox(height: 4),
     pw.Text('Payment: ' + invoice.paymentMethod.toUpperCase()),
     pw.SizedBox(height: 8),
-    pw.Text('Thank you.'),
+    pw.Text((footerText ?? '').trim().isEmpty ? 'Thank you.' : footerText!.trim()),
   ]);
 
   Future<Uint8List> buildA4({
@@ -146,9 +149,10 @@ class InvoicePdfService {
     String? shopAddress,
     String? phone,
     String? gstNumber,
+    String? footerText,
   }) => buildInvoice(
     invoice: invoice, items: items, shopName: shopName, shopAddress: shopAddress,
-    phone: phone, gstNumber: gstNumber, thermal: false,
+    phone: phone, gstNumber: gstNumber, footerText: footerText, thermal: false,
   );
 
   Future<Uint8List> buildThermal({
@@ -158,9 +162,10 @@ class InvoicePdfService {
     String? shopAddress,
     String? phone,
     String? gstNumber,
+    String? footerText,
   }) => buildInvoice(
     invoice: invoice, items: items, shopName: shopName, shopAddress: shopAddress,
-    phone: phone, gstNumber: gstNumber, thermal: true,
+    phone: phone, gstNumber: gstNumber, footerText: footerText, thermal: true,
   );
 
   Future<void> printInvoice({
@@ -170,11 +175,12 @@ class InvoicePdfService {
     String? shopAddress,
     String? phone,
     String? gstNumber,
+    String? footerText,
     bool thermal = false,
   }) async {
     final bytes = await buildInvoice(
       invoice: invoice, items: items, shopName: shopName, shopAddress: shopAddress,
-      phone: phone, gstNumber: gstNumber, thermal: thermal,
+      phone: phone, gstNumber: gstNumber, footerText: footerText, thermal: thermal,
     );
     await Printing.layoutPdf(onLayout: (_) async => bytes);
   }
@@ -186,11 +192,12 @@ class InvoicePdfService {
     String? shopAddress,
     String? phone,
     String? gstNumber,
+    String? footerText,
     bool thermal = false,
   }) async {
     final bytes = await buildInvoice(
       invoice: invoice, items: items, shopName: shopName, shopAddress: shopAddress,
-      phone: phone, gstNumber: gstNumber, thermal: thermal,
+      phone: phone, gstNumber: gstNumber, footerText: footerText, thermal: thermal,
     );
     await Printing.sharePdf(bytes: bytes, filename: invoice.invoiceNumber + '.pdf');
   }
@@ -202,11 +209,12 @@ class InvoicePdfService {
     String? shopAddress,
     String? phone,
     String? gstNumber,
+    String? footerText,
     bool thermal = false,
   }) async {
     final bytes = await buildInvoice(
       invoice: invoice, items: items, shopName: shopName, shopAddress: shopAddress,
-      phone: phone, gstNumber: gstNumber, thermal: thermal,
+      phone: phone, gstNumber: gstNumber, footerText: footerText, thermal: thermal,
     );
     final dir = await getApplicationDocumentsDirectory();
     final file = File(p.join(dir.path, invoice.invoiceNumber + '.pdf'));
