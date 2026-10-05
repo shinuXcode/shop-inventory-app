@@ -1,4 +1,5 @@
 name: SBILL CI
+# Final production validation workflow for every main commit.
 on:
   workflow_dispatch:
   push:
