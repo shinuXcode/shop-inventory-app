@@ -223,3 +223,43 @@ $$;
 
 revoke all on function public.create_business(text,text,text,text,text,text) from public;
 grant execute on function public.create_business(text,text,text,text,text,text) to authenticated;
+
+
+-- Support portal: shared by the SBILL app and website account.
+create table if not exists public.support_tickets (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  business_id uuid references public.businesses(id) on delete set null,
+  category text not null default 'General',
+  subject text not null,
+  message text not null,
+  status text not null default 'open' check (status in ('open','in_progress','closed')),
+  priority text not null default 'normal' check (priority in ('low','normal','high')),
+  admin_reply text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists support_tickets_user_updated_idx
+  on public.support_tickets(user_id, updated_at desc);
+
+alter table public.support_tickets enable row level security;
+
+drop policy if exists "users can read own support tickets" on public.support_tickets;
+create policy "users can read own support tickets"
+  on public.support_tickets for select
+  using (user_id = auth.uid());
+
+drop policy if exists "users can create own support tickets" on public.support_tickets;
+create policy "users can create own support tickets"
+  on public.support_tickets for insert
+  with check (
+    user_id = auth.uid()
+    and (business_id is null or public.is_business_member(business_id))
+  );
+
+drop policy if exists "users can update own support tickets" on public.support_tickets;
+create policy "users can update own support tickets"
+  on public.support_tickets for update
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
