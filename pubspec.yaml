@@ -31,20 +31,18 @@ dev_dependencies:
   flutter_lints: ^4.0.0
   drift_dev: ^2.20.0
   build_runner: ^2.4.12
-  launcher_icons: ^0.15.0
+  flutter_launcher_icons: ^0.14.4
 flutter:
   uses-material-design: true
-  assets:
-    - assets/icon/sbill_icon.svg
-
-launcher_icons:
-  image_path: assets/icon/sbill_icon.svg
-  android:
-    generate: true
-  ios:
-    generate: true
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
   macos:
     generate: true
   windows:
     generate: true
     icon_size: 256
+  image_path: "assets/icon/sbill_icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+
