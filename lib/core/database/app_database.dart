@@ -83,7 +83,6 @@ class SyncQueue extends Table {
   TextColumn get lastError => text().nullable()();
 }
 
-@DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue])
 class TopSellingItem {
   const TopSellingItem({
     required this.name,
@@ -96,6 +95,7 @@ class TopSellingItem {
   final int totalMinor;
 }
 
+@DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
