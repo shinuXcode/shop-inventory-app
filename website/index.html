@@ -8,7 +8,7 @@
 </head>
 <body>
 <header class="nav">
-  <a class="brand" href="#top" aria-label="SBILL home"><span class="logo-mark">S</span><span>SBILL</span></a>
+  <a class="brand" href="#top" aria-label="SBILL home"><span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 64 64" role="img"><path d="M47 15c-4-4-10-6-17-6-10 0-17 5-17 12 0 7 5 10 16 13 10 2 14 4 14 8 0 4-4 7-11 7-6 0-11-2-15-6" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>SBILL</span></a>
   <nav aria-label="Primary">
     <a href="#features">Features</a><a href="#how-it-works">How it works</a><a href="#download">Downloads</a>
     <a href="#feedback">Feedback</a><a href="founder.html">Founder</a>
@@ -18,7 +18,7 @@
 <section class="hero section">
   <div class="hero-copy">
     <p class="eyebrow">BILLING • INVENTORY • BUSINESS</p>
-    <div class="hero-brand"><span class="logo-mark large">S</span><strong>SBILL</strong></div>
+    <div class="hero-brand"><span class="logo-mark large" aria-hidden="true"><svg viewBox="0 0 64 64" role="img"><path d="M47 15c-4-4-10-6-17-6-10 0-17 5-17 12 0 7 5 10 16 13 10 2 14 4 14 8 0 4-4 7-11 7-6 0-11-2-15-6" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><strong>SBILL</strong></div>
     <h1>Simple Billing.<br><span>Smarter Business.</span></h1>
     <p class="lead">Fast checkout, inventory control, customers, invoices and business visibility — designed to keep working offline.</p>
     <div class="actions"><a class="primary" href="#download">Download SBILL</a><a class="secondary" href="#features">Explore features</a></div>
@@ -52,14 +52,14 @@
 <section id="privacy" class="section split"><div><p class="eyebrow">LOCAL-FIRST + CLOUD SYNC</p><h2>Work offline. Sync when connected.</h2><p class="large">Your business data is stored locally first. With an account and workspace, SBILL automatically synchronizes changes between supported devices through Supabase.</p></div>
 <div class="trust-card"><div class="flow">DEVICE <span>→</span> SQLITE <span>→</span> SYNC QUEUE <span>→</span> CLOUD <span>→</span> DEVICES</div><div class="trust-grid"><b>Account based</b><b>Business-scoped RLS</b><b>Automatic retry</b><b>Conflict aware</b></div></div></section>
 
-<section id="download" class="section download"><p class="eyebrow">DIRECT DOWNLOADS</p><h2>Choose your device.</h2><p class="large center-text">Use the platform-specific package when it is published. Development builds remain available from GitHub.</p>
+<section id="download" class="section download"><p class="eyebrow">DIRECT DOWNLOADS</p><h2>Choose your device.</h2><p class="large center-text">Use the platform-specific package when it is published. Verified platform builds are published from the SBILL release pipeline.</p>
 <div class="platform-grid">
-<article><div class="os-icon">A</div><h3>Android</h3><p>APK release package.</p><a class="primary full" href="https://github.com/shinuXcode/shop-inventory-app/actions">Android build / APK</a></article>
-<article><div class="os-icon">W</div><h3>Windows</h3><p>Desktop release package.</p><a class="secondary full" href="https://github.com/shinuXcode/shop-inventory-app/releases">Windows download</a></article>
-<article><div class="os-icon">M</div><h3>macOS</h3><p>Desktop release package.</p><a class="secondary full" href="https://github.com/shinuXcode/shop-inventory-app/releases">macOS download</a></article>
-<article><div class="os-icon">i</div><h3>iOS</h3><p>Build/signing path.</p><a class="secondary full" href="https://github.com/shinuXcode/shop-inventory-app">iOS project</a></article>
+<article><div class="os-icon"><span class="os-letter">A</span></div><h3>Android</h3><p>APK release package.</p><a class="primary full" href="https://github.com/shinuXcode/shop-inventory-app/actions">Android build / APK</a></article>
+<article><div class="os-icon"><span class="os-letter">W</span></div><h3>Windows</h3><p>Desktop release package.</p><a class="secondary full" href="https://github.com/shinuXcode/shop-inventory-app/releases">Windows download</a></article>
+<article><div class="os-icon"><span class="os-letter">M</span></div><h3>macOS</h3><p>Desktop release package.</p><a class="secondary full" href="https://github.com/shinuXcode/shop-inventory-app/releases">macOS download</a></article>
+<article><div class="os-icon"><span class="os-letter">i</span></div><h3>iOS</h3><p>Build/signing path.</p><a class="secondary full" href="https://github.com/shinuXcode/shop-inventory-app">iOS project</a></article>
 </div>
-<p class="download-note">A public stable APK link will replace the Android CI link after a successful release artifact is produced. No fake download URL is used.</p>
+<p class="download-note">Platform download links are updated only after the corresponding CI build passes. No placeholder download is presented as a release.</p>
 </section>
 
 <section id="feedback" class="section feedback"><p class="eyebrow">FEEDBACK & RATINGS</p><h2>Help shape SBILL.</h2>
