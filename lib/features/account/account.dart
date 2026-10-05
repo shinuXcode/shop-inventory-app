@@ -438,7 +438,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         children: [
           CircleAvatar(
             radius: 26,
-            child: Text((user!.email ?? 'S').characters.first.toUpperCase()),
+            child: Text(((user!.email ?? 'S').isEmpty ? 'S' : (user!.email ?? 'S')[0].toUpperCase()),
           ),
           const SizedBox(width: 14),
           Expanded(
