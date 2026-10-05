@@ -84,6 +84,18 @@ class SyncQueue extends Table {
 }
 
 @DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue])
+class TopSellingItem {
+  const TopSellingItem({
+    required this.name,
+    required this.quantity,
+    required this.totalMinor,
+  });
+
+  final String name;
+  final double quantity;
+  final int totalMinor;
+}
+
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
@@ -128,6 +140,27 @@ class AppDatabase extends _$AppDatabase {
   Future<List<Invoice>> invoicesForCustomer(String customerId) => (select(invoices)
     ..where((t) => t.customerId.equals(customerId))
     ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
+
+  Future<List<TopSellingItem>> topSellingItems({int limit = 5}) async {
+    final rows = await customSelect(
+      'SELECT item_name_snapshot AS name, '
+      'SUM(quantity) AS quantity, '
+      'SUM(line_total_minor) AS total_minor '
+      'FROM invoice_items '
+      'GROUP BY item_name_snapshot '
+      'ORDER BY quantity DESC '
+      'LIMIT ?',
+      variables: [Variable<int>(limit)],
+      readsFrom: {invoiceItems},
+    ).get();
+    return rows
+        .map((row) => TopSellingItem(
+              name: row.read<String>('name'),
+              quantity: row.read<num>('quantity').toDouble(),
+              totalMinor: row.read<int>('total_minor'),
+            ))
+        .toList();
+  }
 
   Future<int> todaySalesMinor() async {
     final now = DateTime.now();
