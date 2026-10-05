@@ -31,6 +31,7 @@ jobs:
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
       - run: flutter create --platforms=android,windows,macos .
+      - run: dart run launcher_icons
       - name: Check cloud build configuration
         shell: bash
         run: |
@@ -73,6 +74,7 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=windows .
+      - run: dart run launcher_icons
       - run: flutter build windows --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - name: Package Windows build
         shell: pwsh
@@ -98,6 +100,7 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=macos,ios .
+      - run: dart run launcher_icons
       - run: flutter build macos --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
