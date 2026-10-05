@@ -141,6 +141,19 @@ class AppDatabase extends _$AppDatabase {
     ..where((t) => t.customerId.equals(customerId))
     ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
 
+  Future<int> creditOutstandingMinor() async {
+    final row = await customSelect(
+      'SELECT COALESCE(SUM(total_minor), 0) AS amount '
+      'FROM invoices WHERE payment_method = ? AND status != ?',
+      variables: [
+        const Variable<String>('credit'),
+        const Variable<String>('cancelled'),
+      ],
+      readsFrom: {invoices},
+    ).getSingle();
+    return row.read<int>('amount');
+  }
+
   Future<List<TopSellingItem>> topSellingItems({int limit = 5}) async {
     final rows = await customSelect(
       'SELECT item_name_snapshot AS name, '
