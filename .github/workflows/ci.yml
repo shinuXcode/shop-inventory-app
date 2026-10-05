@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: sbill-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   FLUTTER_VERSION: 3.47.6
@@ -19,6 +19,7 @@ env:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -73,7 +74,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
-    needs: quality
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -108,7 +109,7 @@ jobs:
 
   macos:
     runs-on: macos-latest
-    needs: quality
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -117,7 +118,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: dart run build_runner build
-      - run: flutter create --platforms=macos,ios .
+      - run: flutter create --platforms=macos .
       - name: Restore launcher icon
         shell: bash
         run: |
@@ -140,6 +141,29 @@ jobs:
         with:
           name: sbill-macos-package
           path: sbill-macos.zip
+
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build
+      - run: flutter create --platforms=ios .
+      - name: Restore launcher icon
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          from pathlib import Path
+          raw = Path("assets/icon/sbill_icon.png.b64").read_text().strip()
+          Path("assets/icon/sbill_icon.png").write_bytes(base64.b64decode(raw))
+          PY
+      - run: dart run flutter_launcher_icons
       - run: flutter build ios --no-codesign --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
@@ -155,3 +179,20 @@ jobs:
         with:
           name: sbill-ios-package
           path: sbill-ios-unsigned.zip
+
+  release-gate:
+    if: always()
+    needs: [quality, windows, macos, ios]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release jobs
+        shell: bash
+        run: |
+          echo "quality=${{ needs.quality.result }}"
+          echo "windows=${{ needs.windows.result }}"
+          echo "macos=${{ needs.macos.result }}"
+          echo "ios=${{ needs.ios.result }}"
+          test "${{ needs.quality.result }}" = "success"
+          test "${{ needs.windows.result }}" = "success"
+          test "${{ needs.macos.result }}" = "success"
+          test "${{ needs.ios.result }}" = "success"
