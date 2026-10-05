@@ -29,14 +29,18 @@ jobs:
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
       - run: flutter create --platforms=android,windows,macos .
-      - name: Restore launcher icon
+      - name: Generate launcher icon from source SVG
         shell: bash
         run: |
+          python -m pip install --disable-pip-version-check --no-input cairosvg
           python - <<'PY'
-          import base64
-          from pathlib import Path
-          raw = Path("assets/icon/sbill_icon.png.b64").read_text().strip()
-          Path("assets/icon/sbill_icon.png").write_bytes(base64.b64decode(raw))
+          import cairosvg
+          cairosvg.svg2png(
+              url="assets/icon/sbill_icon.svg",
+              write_to="assets/icon/sbill_icon.png",
+              output_width=1024,
+              output_height=1024,
+          )
           PY
       - run: dart run flutter_launcher_icons
       - name: Check cloud build configuration
@@ -81,14 +85,18 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=windows .
-      - name: Restore launcher icon
+      - name: Generate launcher icon from source SVG
         shell: bash
         run: |
+          python -m pip install --disable-pip-version-check --no-input cairosvg
           python - <<'PY'
-          import base64
-          from pathlib import Path
-          raw = Path("assets/icon/sbill_icon.png.b64").read_text().strip()
-          Path("assets/icon/sbill_icon.png").write_bytes(base64.b64decode(raw))
+          import cairosvg
+          cairosvg.svg2png(
+              url="assets/icon/sbill_icon.svg",
+              write_to="assets/icon/sbill_icon.png",
+              output_width=1024,
+              output_height=1024,
+          )
           PY
       - run: dart run flutter_launcher_icons
       - run: flutter build windows --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
@@ -116,14 +124,18 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=macos .
-      - name: Restore launcher icon
+      - name: Generate launcher icon from source SVG
         shell: bash
         run: |
+          python -m pip install --disable-pip-version-check --no-input cairosvg
           python - <<'PY'
-          import base64
-          from pathlib import Path
-          raw = Path("assets/icon/sbill_icon.png.b64").read_text().strip()
-          Path("assets/icon/sbill_icon.png").write_bytes(base64.b64decode(raw))
+          import cairosvg
+          cairosvg.svg2png(
+              url="assets/icon/sbill_icon.svg",
+              write_to="assets/icon/sbill_icon.png",
+              output_width=1024,
+              output_height=1024,
+          )
           PY
       - run: dart run flutter_launcher_icons
       - run: flutter build macos --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
@@ -151,14 +163,18 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=ios .
-      - name: Restore launcher icon
+      - name: Generate launcher icon from source SVG
         shell: bash
         run: |
+          python -m pip install --disable-pip-version-check --no-input cairosvg
           python - <<'PY'
-          import base64
-          from pathlib import Path
-          raw = Path("assets/icon/sbill_icon.png.b64").read_text().strip()
-          Path("assets/icon/sbill_icon.png").write_bytes(base64.b64decode(raw))
+          import cairosvg
+          cairosvg.svg2png(
+              url="assets/icon/sbill_icon.svg",
+              write_to="assets/icon/sbill_icon.png",
+              output_width=1024,
+              output_height=1024,
+          )
           PY
       - run: dart run flutter_launcher_icons
       - run: flutter build ios --no-codesign --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
