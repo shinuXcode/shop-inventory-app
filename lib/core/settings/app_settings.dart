@@ -16,7 +16,9 @@ class AppSettings {
   bool get thermalReceipt => _prefs.getBool('thermalReceipt') ?? false;
   bool get darkMode => _prefs.getBool('darkMode') ?? false;
   String? get businessId => _prefs.getString('businessId');
+  String? get accountUserId => _prefs.getString('accountUserId');
   bool get cloudConfigured => businessId != null && businessId!.isNotEmpty;
+  bool get accountBound => accountUserId != null && accountUserId!.isNotEmpty;
 
   Future<void> save({
     required String businessName,
@@ -29,6 +31,7 @@ class AppSettings {
     required bool darkMode,
     String invoiceFooter = 'Thank you for your business.',
     String? businessId,
+    String? accountUserId,
   }) async {
     await _prefs.setString('businessName', businessName);
     await _prefs.setString('businessPhone', businessPhone);
@@ -42,5 +45,13 @@ class AppSettings {
     if (businessId != null && businessId.isNotEmpty) {
       await _prefs.setString('businessId', businessId);
     }
+    if (accountUserId != null && accountUserId.isNotEmpty) {
+      await _prefs.setString('accountUserId', accountUserId);
+    }
+  }
+
+  Future<void> clearCloudBinding() async {
+    await _prefs.remove('businessId');
+    await _prefs.remove('accountUserId');
   }
 }
