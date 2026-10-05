@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import '../billing/billing_calculator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 part 'app_database.g.dart';
 
 class Items extends Table {
@@ -237,8 +238,334 @@ class AppDatabase extends _$AppDatabase {
         ),
       );
 
-  Future<List<Invoice>> recentInvoices({int limit = 30}) => (select(invoices)
-    ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])..limit(limit)).get();
+  Future<List<Item>> activeItemsForExport() => (select(items)
+    ..where((t) => t.isActive.equals(true))
+    ..orderBy([(t) => OrderingTerm(expression: t.name)])).get();
+
+  Future<CustomerStats> customerStats(String customerId) async {
+    final rows = await invoicesForCustomer(customerId);
+    var totalMinor = 0;
+    var creditMinor = 0;
+    for (final row in rows) {
+      totalMinor += row.totalMinor;
+      if (row.paymentMethod == 'credit') creditMinor += row.totalMinor;
+    }
+    return CustomerStats(
+      invoiceCount: rows.length,
+      totalMinor: totalMinor,
+      creditMinor: creditMinor,
+    );
+  }
+
+  Future<Map<String, dynamic>> exportSnapshot() async {
+    final itemRows = await select(items).get();
+    final customerRows = await select(customers).get();
+    final invoiceRows = await select(invoices).get();
+    final invoiceItemRows = await select(invoiceItems).get();
+    return {
+      'format': 'sbill-backup-v1',
+      'exportedAt': DateTime.now().toIso8601String(),
+      'items': itemRows.map((x) => {
+        'id': x.id, 'sku': x.sku, 'name': x.name, 'description': x.description,
+        'priceMinor': x.priceMinor, 'costMinor': x.costMinor, 'taxRate': x.taxRate,
+        'stockQuantity': x.stockQuantity, 'lowStockThreshold': x.lowStockThreshold,
+        'category': x.category, 'barcode': x.barcode, 'isActive': x.isActive,
+        'createdAt': x.createdAt.toIso8601String(), 'updatedAt': x.updatedAt.toIso8601String(),
+      }).toList(),
+      'customers': customerRows.map((x) => {
+        'id': x.id, 'name': x.name, 'phone': x.phone, 'email': x.email,
+        'address': x.address, 'notes': x.notes,
+        'createdAt': x.createdAt.toIso8601String(), 'updatedAt': x.updatedAt.toIso8601String(),
+      }).toList(),
+      'invoices': invoiceRows.map((x) => {
+        'id': x.id, 'invoiceNumber': x.invoiceNumber, 'customerId': x.customerId,
+        'subtotalMinor': x.subtotalMinor, 'discountMinor': x.discountMinor,
+        'taxMinor': x.taxMinor, 'totalMinor': x.totalMinor, 'paymentMethod': x.paymentMethod,
+        'status': x.status, 'notes': x.notes,
+        'createdAt': x.createdAt.toIso8601String(), 'updatedAt': x.updatedAt.toIso8601String(),
+      }).toList(),
+      'invoiceItems': invoiceItemRows.map((x) => {
+        'id': x.id, 'invoiceId': x.invoiceId, 'itemId': x.itemId,
+        'itemNameSnapshot': x.itemNameSnapshot, 'skuSnapshot': x.skuSnapshot,
+        'quantity': x.quantity, 'unitPriceMinor': x.unitPriceMinor,
+        'taxRate': x.taxRate, 'taxMinor': x.taxMinor, 'lineTotalMinor': x.lineTotalMinor,
+      }).toList(),
+    };
+  }
+
+  Future<int> importProductRows(List<Map<String, String>> rows) async {
+    final existing = await select(items).get();
+    final bySku = <String, Item>{};
+    final byBarcode = <String, Item>{};
+    final byName = <String, Item>{};
+    for (final item in existing) {
+      if ((item.sku ?? '').isNotEmpty) bySku[item.sku!.trim().toLowerCase()] = item;
+      if ((item.barcode ?? '').isNotEmpty) byBarcode[item.barcode!.trim()] = item;
+      byName[item.name.trim().toLowerCase()] = item;
+    }
+
+    var imported = 0;
+    await transaction(() async {
+      for (final row in rows) {
+        final name = _rowValue(row, const ['name', 'product', 'product_name', 'item_name']).trim();
+        if (name.isEmpty) continue;
+        final sku = _rowValue(row, const ['sku', 'code']).trim();
+        final barcode = _rowValue(row, const ['barcode', 'bar_code']).trim();
+        final existingItem = (sku.isNotEmpty ? bySku[sku.toLowerCase()] : null) ??
+            (barcode.isNotEmpty ? byBarcode[barcode] : null) ??
+            byName[name.toLowerCase()];
+        final now = DateTime.now();
+        final id = existingItem?.id ?? const Uuid().v4();
+        final companion = ItemsCompanion(
+          id: Value(id),
+          sku: Value(sku.isEmpty ? null : sku),
+          name: Value(name),
+          barcode: Value(barcode.isEmpty ? null : barcode),
+          category: Value(_rowValue(row, const ['category', 'group']).trim().isEmpty
+              ? null : _rowValue(row, const ['category', 'group']).trim()),
+          priceMinor: Value(_rowMoneyMinor(row, const ['price', 'price_rupees', 'selling_price', 'rate'])),
+          taxRate: Value(_rowDouble(row, const ['tax', 'tax_rate', 'gst'])),
+          stockQuantity: Value(_rowInt(row, const ['stock', 'quantity', 'stock_quantity'])),
+          lowStockThreshold: Value(_rowInt(row, const ['low_stock_threshold', 'reorder_level'], fallback: 5)),
+          updatedAt: Value(now),
+          isActive: const Value(true),
+          syncStatus: const Value('pending'),
+        );
+        if (existingItem == null) {
+          await into(items).insert(
+            ItemsCompanion.insert(
+              id: id,
+              sku: companion.sku,
+              name: name,
+              priceMinor: companion.priceMinor.value,
+              taxRate: companion.taxRate,
+              stockQuantity: companion.stockQuantity,
+              lowStockThreshold: companion.lowStockThreshold,
+              category: companion.category,
+              barcode: companion.barcode,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+        } else {
+          await into(items).insertOnConflictUpdate(companion);
+        }
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'item', entityId: id, operation: 'upsert', createdAt: now,
+        ));
+        final saved = (await (select(items)..where((t) => t.id.equals(id))).getSingle());
+        if ((saved.sku ?? '').isNotEmpty) bySku[saved.sku!.trim().toLowerCase()] = saved;
+        if ((saved.barcode ?? '').isNotEmpty) byBarcode[saved.barcode!.trim()] = saved;
+        byName[saved.name.trim().toLowerCase()] = saved;
+        imported++;
+      }
+    });
+    return imported;
+  }
+
+  Future<int> importCustomerRows(List<Map<String, String>> rows) async {
+    final existing = await select(customers).get();
+    final byPhone = <String, Customer>{};
+    final byEmail = <String, Customer>{};
+    final byName = <String, Customer>{};
+    for (final customer in existing) {
+      if ((customer.phone ?? '').isNotEmpty) byPhone[customer.phone!.trim()] = customer;
+      if ((customer.email ?? '').isNotEmpty) byEmail[customer.email!.trim().toLowerCase()] = customer;
+      byName[customer.name.trim().toLowerCase()] = customer;
+    }
+
+    var imported = 0;
+    await transaction(() async {
+      for (final row in rows) {
+        final name = _rowValue(row, const ['name', 'customer', 'customer_name']).trim();
+        if (name.isEmpty) continue;
+        final phone = _rowValue(row, const ['phone', 'mobile', 'contact']).trim();
+        final email = _rowValue(row, const ['email', 'email_address']).trim();
+        final existingCustomer = (phone.isNotEmpty ? byPhone[phone] : null) ??
+            (email.isNotEmpty ? byEmail[email.toLowerCase()] : null) ??
+            byName[name.toLowerCase()];
+        final now = DateTime.now();
+        final id = existingCustomer?.id ?? const Uuid().v4();
+        final companion = CustomersCompanion(
+          id: Value(id),
+          name: Value(name),
+          phone: Value(phone.isEmpty ? null : phone),
+          email: Value(email.isEmpty ? null : email),
+          address: Value(_rowValue(row, const ['address', 'location']).trim().isEmpty
+              ? null : _rowValue(row, const ['address', 'location']).trim()),
+          notes: Value(_rowValue(row, const ['notes', 'note']).trim().isEmpty
+              ? null : _rowValue(row, const ['notes', 'note']).trim()),
+          updatedAt: Value(now),
+          syncStatus: const Value('pending'),
+        );
+        if (existingCustomer == null) {
+          await into(customers).insert(
+            CustomersCompanion.insert(
+              id: id,
+              name: name,
+              phone: companion.phone,
+              email: companion.email,
+              address: companion.address,
+              notes: companion.notes,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          );
+        } else {
+          await into(customers).insertOnConflictUpdate(companion);
+        }
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'customer', entityId: id, operation: 'upsert', createdAt: now,
+        ));
+        final saved = await (select(customers)..where((t) => t.id.equals(id))).getSingle();
+        if ((saved.phone ?? '').isNotEmpty) byPhone[saved.phone!.trim()] = saved;
+        if ((saved.email ?? '').isNotEmpty) byEmail[saved.email!.trim().toLowerCase()] = saved;
+        byName[saved.name.trim().toLowerCase()] = saved;
+        imported++;
+      }
+    });
+    return imported;
+  }
+
+  Future<int> importSnapshot(Map<String, dynamic> snapshot) async {
+    if (snapshot['format'] != 'sbill-backup-v1') {
+      throw ArgumentError('Unsupported SBILL backup format.');
+    }
+    final itemRows = (snapshot['items'] as List?)?.whereType<Map>().toList() ?? const [];
+    final customerRows = (snapshot['customers'] as List?)?.whereType<Map>().toList() ?? const [];
+    final invoiceRows = (snapshot['invoices'] as List?)?.whereType<Map>().toList() ?? const [];
+    final invoiceItemRows = (snapshot['invoiceItems'] as List?)?.whereType<Map>().toList() ?? const [];
+
+    await transaction(() async {
+      for (final row in itemRows) {
+        final now = _rowDate(row['updatedAt']) ?? DateTime.now();
+        await into(items).insertOnConflictUpdate(ItemsCompanion(
+          id: Value(row['id'].toString()),
+          sku: Value(_nullable(row['sku'])),
+          name: Value(row['name'].toString()),
+          description: Value(_nullable(row['description'])),
+          priceMinor: Value(_number(row['priceMinor'])),
+          costMinor: Value(_number(row['costMinor'])),
+          taxRate: Value(_decimal(row['taxRate'])),
+          stockQuantity: Value(_number(row['stockQuantity'])),
+          lowStockThreshold: Value(_number(row['lowStockThreshold'], 5)),
+          category: Value(_nullable(row['category'])),
+          barcode: Value(_nullable(row['barcode'])),
+          isActive: Value(row['isActive'] != false),
+          createdAt: Value(_rowDate(row['createdAt']) ?? now),
+          updatedAt: Value(now),
+          syncStatus: const Value('pending'),
+        ));
+      }
+      for (final row in customerRows) {
+        final now = _rowDate(row['updatedAt']) ?? DateTime.now();
+        await into(customers).insertOnConflictUpdate(CustomersCompanion(
+          id: Value(row['id'].toString()),
+          name: Value(row['name'].toString()),
+          phone: Value(_nullable(row['phone'])),
+          email: Value(_nullable(row['email'])),
+          address: Value(_nullable(row['address'])),
+          notes: Value(_nullable(row['notes'])),
+          createdAt: Value(_rowDate(row['createdAt']) ?? now),
+          updatedAt: Value(now),
+          syncStatus: const Value('pending'),
+        ));
+      }
+      for (final row in invoiceRows) {
+        final now = _rowDate(row['updatedAt']) ?? DateTime.now();
+        await into(invoices).insertOnConflictUpdate(InvoicesCompanion(
+          id: Value(row['id'].toString()),
+          invoiceNumber: Value(row['invoiceNumber'].toString()),
+          customerId: Value(_nullable(row['customerId'])),
+          subtotalMinor: Value(_number(row['subtotalMinor'])),
+          discountMinor: Value(_number(row['discountMinor'])),
+          taxMinor: Value(_number(row['taxMinor'])),
+          totalMinor: Value(_number(row['totalMinor'])),
+          paymentMethod: Value(row['paymentMethod'].toString()),
+          status: Value(row['status']?.toString() ?? 'completed'),
+          notes: Value(_nullable(row['notes'])),
+          createdAt: Value(_rowDate(row['createdAt']) ?? now),
+          updatedAt: Value(now),
+          syncStatus: const Value('pending'),
+        ));
+      }
+      for (final row in invoiceItemRows) {
+        await into(invoiceItems).insertOnConflictUpdate(InvoiceItemsCompanion(
+          id: Value(row['id'].toString()),
+          invoiceId: Value(row['invoiceId'].toString()),
+          itemId: Value(row['itemId'].toString()),
+          itemNameSnapshot: Value(row['itemNameSnapshot'].toString()),
+          skuSnapshot: Value(_nullable(row['skuSnapshot'])),
+          quantity: Value(_number(row['quantity'])),
+          unitPriceMinor: Value(_number(row['unitPriceMinor'])),
+          taxRate: Value(_decimal(row['taxRate'])),
+          taxMinor: Value(_number(row['taxMinor'])),
+          lineTotalMinor: Value(_number(row['lineTotalMinor'])),
+        ));
+      }
+      for (final row in itemRows) {
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'item', entityId: row['id'].toString(), operation: 'upsert', createdAt: DateTime.now(),
+        ));
+      }
+      for (final row in customerRows) {
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'customer', entityId: row['id'].toString(), operation: 'upsert', createdAt: DateTime.now(),
+        ));
+      }
+      for (final row in invoiceRows) {
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'invoice', entityId: row['id'].toString(), operation: 'upsert', createdAt: DateTime.now(),
+        ));
+      }
+    });
+    return itemRows.length + customerRows.length + invoiceRows.length + invoiceItemRows.length;
+  }
+
+  static String _rowValue(Map<String, String> row, List<String> keys) {
+    for (final key in keys) {
+      final value = row[key];
+      if (value != null && value.trim().isNotEmpty) return value.trim();
+    }
+    return '';
+  }
+
+  static int _rowMoneyMinor(
+    Map<String, String> row,
+    List<String> keys,
+  ) => (_rowDouble(row, keys) * 100).round();
+
+  static double _rowDouble(Map<String, String> row, List<String> keys) {
+    final value = _rowValue(row, keys).replaceAll(RegExp(r'[^0-9.\-]'), '');
+    return double.tryParse(value) ?? 0;
+  }
+
+  static int _rowInt(
+    Map<String, String> row,
+    List<String> keys, {
+    int fallback = 0,
+  }) {
+    final value = _rowValue(row, keys);
+    return int.tryParse(value) ?? fallback;
+  }
+
+  static String? _nullable(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty || text == 'null' ? null : text;
+  }
+
+  static int _number(Object? value, [int fallback = 0]) =>
+      int.tryParse(value?.toString() ?? '') ?? fallback;
+
+  static double _decimal(Object? value, [double fallback = 0]) =>
+      double.tryParse(value?.toString() ?? '') ?? fallback;
+
+  static DateTime? _rowDate(Object? value) {
+    final text = value?.toString();
+    return text == null ? null : DateTime.tryParse(text);
+  }
+
+$marker
 }
 
 class CartLine {
@@ -254,3 +581,16 @@ LazyDatabase _openConnection() => LazyDatabase(() async {
   final dir = await getApplicationSupportDirectory();
   return NativeDatabase.createInBackground(File(p.join(dir.path, 'sbill.sqlite')));
 });
+
+
+class CustomerStats {
+  const CustomerStats({
+    required this.invoiceCount,
+    required this.totalMinor,
+    required this.creditMinor,
+  });
+
+  final int invoiceCount;
+  final int totalMinor;
+  final int creditMinor;
+}
