@@ -15,6 +15,7 @@ class MigrationPage extends ConsumerStatefulWidget {
 
 class _MigrationPageState extends ConsumerState<MigrationPage> {
   ImportPreview? preview;
+  int duplicateCount = 0;
   bool busy = false;
 
   Future<void> _pick() async {
@@ -22,7 +23,11 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
     try {
       final value = await DataTransferService.pick();
       if (!mounted) return;
-      setState(() => preview = value);
+      setState(() {
+        preview = value;
+        duplicateCount = 0;
+      });
+      if (value != null) await _countDuplicates(value);
       if (value != null && value.isValid && value.kind == 'unknown') {
         _message('Could not determine the file type. Use a header row with product or customer fields.');
       }
@@ -31,6 +36,59 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
     } finally {
       if (mounted) setState(() => busy = false);
     }
+  }
+
+  Future<void> _countDuplicates(ImportPreview value) async {
+    final db = ref.read(databaseProvider);
+    var count = 0;
+
+    if (value.kind == 'products') {
+      final existing = await db.activeItemsForExport();
+      final sku = <String>{};
+      final barcode = <String>{};
+      final names = <String>{};
+      for (final item in existing) {
+        final itemSku = (item.sku ?? '').trim();
+        final itemBarcode = (item.barcode ?? '').trim();
+        if (itemSku.isNotEmpty) sku.add(itemSku.toLowerCase());
+        if (itemBarcode.isNotEmpty) barcode.add(itemBarcode);
+        if (item.name.trim().isNotEmpty) names.add(item.name.trim().toLowerCase());
+      }
+      for (final row in value.rows) {
+        final rowSku = (row['sku'] ?? row['code'] ?? '').trim().toLowerCase();
+        final rowBarcode = (row['barcode'] ?? row['bar_code'] ?? '').trim();
+        final rowName = (row['name'] ?? '').trim().toLowerCase();
+        if ((rowSku.isNotEmpty && sku.contains(rowSku)) ||
+            (rowBarcode.isNotEmpty && barcode.contains(rowBarcode)) ||
+            (rowName.isNotEmpty && names.contains(rowName))) {
+          count++;
+        }
+      }
+    } else if (value.kind == 'customers') {
+      final existing = await db.getCustomers();
+      final phones = <String>{};
+      final emails = <String>{};
+      final names = <String>{};
+      for (final customer in existing) {
+        final customerPhone = (customer.phone ?? '').trim();
+        final customerEmail = (customer.email ?? '').trim();
+        if (customerPhone.isNotEmpty) phones.add(customerPhone);
+        if (customerEmail.isNotEmpty) emails.add(customerEmail.toLowerCase());
+        if (customer.name.trim().isNotEmpty) names.add(customer.name.trim().toLowerCase());
+      }
+      for (final row in value.rows) {
+        final rowPhone = (row['phone'] ?? row['mobile'] ?? row['contact'] ?? '').trim();
+        final rowEmail = (row['email'] ?? row['email_address'] ?? '').trim().toLowerCase();
+        final rowName = (row['name'] ?? row['customer'] ?? row['customer_name'] ?? '').trim().toLowerCase();
+        if ((rowPhone.isNotEmpty && phones.contains(rowPhone)) ||
+            (rowEmail.isNotEmpty && emails.contains(rowEmail)) ||
+            (rowName.isNotEmpty && names.contains(rowName))) {
+          count++;
+        }
+      }
+    }
+
+    if (mounted) setState(() => duplicateCount = count);
   }
 
   Future<void> _import() async {
@@ -166,6 +224,22 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
             ),
             const SizedBox(height: 8),
             Text(value.isValid ? count.toString() + ' records ready to import' : value.error!),
+            if (value.isValid && value.kind != 'backup' && value.rows.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                duplicateCount == 0
+                    ? 'No matching records found in the current database.'
+                    : duplicateCount.toString() + ' potential duplicate(s) detected. Existing records will be updated using matching fields.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Detected fields: ' + value.rows.first.keys.take(8).join(', '),
+                style: Theme.of(context).textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
             if (value.rows.isNotEmpty) ...[
               const SizedBox(height: 12),
               ...value.rows.take(5).map(
