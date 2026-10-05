@@ -166,6 +166,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
       shopAddress: settings.businessAddress,
       phone: settings.businessPhone,
       gstNumber: settings.gstNumber,
+      footerText: settings.invoiceFooter,
       thermal: thermal,
     );
   }
@@ -178,6 +179,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
       shopAddress: settings.businessAddress,
       phone: settings.businessPhone,
       gstNumber: settings.gstNumber,
+      footerText: settings.invoiceFooter,
     );
   }
 
@@ -189,6 +191,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
       shopAddress: settings.businessAddress,
       phone: settings.businessPhone,
       gstNumber: settings.gstNumber,
+      footerText: settings.invoiceFooter,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
