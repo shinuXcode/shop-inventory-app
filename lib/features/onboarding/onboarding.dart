@@ -12,11 +12,14 @@ class OnboardingDialog extends StatefulWidget {
 class _OnboardingDialogState extends State<OnboardingDialog> {
   final pageController = PageController();
   final businessName = TextEditingController();
+  final gstNumber = TextEditingController();
+  final invoicePrefix = TextEditingController(text: 'INV');
+  bool thermalReceipt = false;
   var page = 0;
 
   static const steps = [
     ('Welcome to SBILL', 'Fast billing, inventory and customers without forcing you into a cloud account.'),
-    ('Set up your shop', 'Enter your business name now. You can complete GST, address and invoice settings later.'),
+    ('Set up your shop', 'Set your shop identity, GSTIN, invoice numbering and receipt preference now.'),
     ('Switch from another app', 'Bring products and customers with CSV, JSON or TXT files, or restore a full SBILL backup.'),
     ('Ready for the counter', 'Use Billing for the fastest daily workflow. Search, add, pay and issue an invoice.'),
   ];
@@ -50,7 +53,7 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
                   style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 22),
-                if (index == 1)
+                if (index == 1) ...[
                   TextField(
                     controller: businessName,
                     autofocus: true,
@@ -60,6 +63,29 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
                       hintText: 'e.g. Sadab Mobile Store',
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: gstNumber,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.receipt_long_outlined),
+                      labelText: 'GSTIN (optional)',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: invoicePrefix,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.tag_outlined),
+                      labelText: 'Invoice prefix',
+                    ),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Default to thermal receipt'),
+                    value: thermalReceipt,
+                    onChanged: (value) => setState(() => thermalReceipt = value),
+                  ),
+                ],
                 if (index == 2)
                   const Card(
                     child: ListTile(
@@ -103,6 +129,11 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
     await prefs.setBool('onboardingComplete', true);
     final name = businessName.text.trim();
     if (name.isNotEmpty) await prefs.setString('businessName', name);
+    final gst = gstNumber.text.trim();
+    if (gst.isNotEmpty) await prefs.setString('gstNumber', gst);
+    final prefix = invoicePrefix.text.trim();
+    if (prefix.isNotEmpty) await prefs.setString('invoicePrefix', prefix);
+    await prefs.setBool('thermalReceipt', thermalReceipt);
     if (mounted) Navigator.pop(context);
   }
 
@@ -130,6 +161,8 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
   void dispose() {
     pageController.dispose();
     businessName.dispose();
+    gstNumber.dispose();
+    invoicePrefix.dispose();
     super.dispose();
   }
 }
