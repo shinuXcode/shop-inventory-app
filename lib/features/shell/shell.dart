@@ -7,6 +7,7 @@ import '../customers/customers.dart';
 import '../invoices/invoices.dart';
 import '../settings/settings.dart';
 import '../onboarding/onboarding.dart';
+import '../../core/widgets/sbill_logo.dart';
 
 class Shell extends StatefulWidget {
   const Shell({super.key});
@@ -63,15 +64,7 @@ class _ShellState extends State<Shell> {
           leading: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: const Icon(Icons.receipt_long_outlined),
-              ),
+              const SBillLogo(size: 38),
               if (MediaQuery.sizeOf(context).width >= 1200) ...[
                 const SizedBox(width: 10),
                 Text('SBILL', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
