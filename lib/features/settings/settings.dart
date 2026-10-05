@@ -8,6 +8,8 @@ import '../../core/settings/app_settings.dart';
 import '../../core/sync/sync_service.dart';
 import '../migration/migration.dart';
 import '../account/account.dart';
+import '../about/about.dart';
+import '../support/support.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -62,6 +64,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       invoiceFooter: invoiceFooter.text.trim(),
     );
     await ref.read(themeModeProvider.notifier).setDarkMode(dark);
+    if (_signedIn && settings.businessId != null) {
+      await ref.read(syncServiceProvider).syncNow();
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings saved locally')));
     }
@@ -246,9 +251,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 920),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
           Text('Business information', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           TextField(controller: business, decoration: const InputDecoration(labelText: 'Business name')),
@@ -326,12 +334,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: Text('Offline-first'),
             subtitle: Text('Billing and inventory are stored in local SQLite first. Cloud sync is optional and retryable.'),
           ),
-          const ListTile(
-            leading: Icon(Icons.info_outline),
-            title: Text('About SBILL'),
-            subtitle: Text('Simple Billing. Smarter Business.'),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.support_agent_outlined),
+              title: const Text('Support Center'),
+              subtitle: const Text('Create and track support requests with your SBILL account.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportPage())),
+            ),
           ),
-        ],
+          const SizedBox(height: 10),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('About SBILL'),
+              subtitle: const Text('Website, founder page, portfolio and project links.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutPage())),
+            ),
+          ),
+            ],
+          ),
+        ),
       ),
     );
   }
