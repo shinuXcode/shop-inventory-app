@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -21,6 +22,13 @@ class InvoicePdfService {
     bool thermal = false,
   }) async {
     final doc = pw.Document();
+    pw.MemoryImage? logo;
+    try {
+      final data = await rootBundle.load('assets/icon/sbill_icon.png');
+      logo = pw.MemoryImage(data.buffer.asUint8List());
+    } catch (_) {
+      logo = null;
+    }
     final pageFormat = thermal
         ? PdfPageFormat(80 * PdfPageFormat.mm, 280 * PdfPageFormat.mm,
             marginLeft: 4 * PdfPageFormat.mm,
@@ -33,8 +41,8 @@ class InvoicePdfService {
       pw.Page(
         pageFormat: pageFormat,
         build: (context) => thermal
-            ? _thermalPage(invoice, items, shopName, shopAddress, phone, gstNumber, footerText)
-            : _a4Page(invoice, items, shopName, shopAddress, phone, gstNumber, footerText),
+            ? _thermalPage(invoice, items, shopName, shopAddress, phone, gstNumber, footerText, logo)
+            : _a4Page(invoice, items, shopName, shopAddress, phone, gstNumber, footerText, logo),
       ),
     );
     return doc.save();
@@ -48,9 +56,11 @@ class InvoicePdfService {
     String? phone,
     String? gstNumber,
     String? footerText,
+    pw.MemoryImage? logo,
   ) => pw.Padding(
     padding: const pw.EdgeInsets.all(28),
     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      if (logo != null) pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Image(logo, width: 54, height: 54)),
       pw.Text(shopName, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
       if ((shopAddress ?? '').isNotEmpty) pw.Text(shopAddress!),
       if ((phone ?? '').isNotEmpty) pw.Text(phone!),
@@ -103,7 +113,9 @@ class InvoicePdfService {
     String? phone,
     String? gstNumber,
     String? footerText,
+    pw.MemoryImage? logo,
   ) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+    if (logo != null) pw.Image(logo, width: 42, height: 42),
     pw.Text(shopName, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
     if ((shopAddress ?? '').isNotEmpty) pw.Text(shopAddress!, textAlign: pw.TextAlign.center),
     if ((phone ?? '').isNotEmpty) pw.Text(phone!),
