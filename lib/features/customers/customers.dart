@@ -105,6 +105,8 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
   );
 
   Future<void> _showCustomer(Customer customer) async {
+    final stats = await ref.read(databaseProvider).customerStats(customer.id);
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
@@ -129,6 +131,23 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
       ),
     );
   }
+
+  Widget _stat(BuildContext context, String label, String value, IconData icon) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(height: 5),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+      ],
+    ),
+  );
 
   Future<void> _history(Customer customer) async {
     final invoices = await ref.read(databaseProvider).invoicesForCustomer(customer.id);
