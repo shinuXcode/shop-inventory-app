@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/theme.dart';
 import 'core/database/app_database.dart';
 import 'features/shell/shell.dart';
+import 'core/sync/sync_service.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) =>
   throw UnimplementedError('SharedPreferences must be overridden in main'));
@@ -36,12 +37,15 @@ class SBillApp extends ConsumerWidget {
   const SBillApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(syncServiceProvider);
+    return MaterialApp(
     title: 'SBILL',
     debugShowCheckedModeBanner: false,
     theme: buildLightTheme(),
     darkTheme: buildDarkTheme(),
     themeMode: ref.watch(themeModeProvider),
     home: const Shell(),
-  );
+    );
+  }
 }
