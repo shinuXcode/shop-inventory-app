@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/widgets/sbill_logo.dart';
 
 class OnboardingDialog extends StatefulWidget {
   const OnboardingDialog({super.key});
@@ -26,15 +27,7 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.receipt_long_outlined),
-          ),
+          const SBillLogo(size: 40),
           const SizedBox(width: 12),
           Expanded(child: Text(current.$1)),
         ],
