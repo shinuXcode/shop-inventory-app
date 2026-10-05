@@ -31,7 +31,16 @@ jobs:
       - run: flutter analyze --no-fatal-infos --no-fatal-warnings
       - run: flutter test
       - run: flutter create --platforms=android,windows,macos .
-      - run: dart run launcher_icons
+      - name: Restore launcher icon
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          from pathlib import Path
+          raw = Path("assets/icon/sbill_icon.png.b64").read_text().strip()
+          Path("assets/icon/sbill_icon.png").write_bytes(base64.b64decode(raw))
+          PY
+      - run: dart run flutter_launcher_icons
       - name: Check cloud build configuration
         shell: bash
         run: |
@@ -74,7 +83,16 @@ jobs:
       - run: flutter pub get
       - run: dart run build_runner build
       - run: flutter create --platforms=windows .
-      - run: dart run launcher_icons
+      - name: Restore launcher icon
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          from pathlib import Path
+          raw = Path("assets/icon/sbill_icon.png.b64").read_text().strip()
+          Path("assets/icon/sbill_icon.png").write_bytes(base64.b64decode(raw))
+          PY
+      - run: dart run flutter_launcher_icons
       - run: flutter build windows --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - name: Package Windows build
         shell: pwsh
