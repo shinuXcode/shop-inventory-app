@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../app.dart';
+import '../shell/shell.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -71,6 +72,19 @@ class DashboardPage extends ConsumerWidget {
                     );
                   }),
                   const SizedBox(height: 18),
+                  Text('Quick actions', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      _quickAction(context, 'New bill', Icons.point_of_sale_outlined, 1),
+                      _quickAction(context, 'Add product', Icons.add_box_outlined, 2),
+                      _quickAction(context, 'Add customer', Icons.person_add_outlined, 3),
+                      _quickAction(context, 'Switch to SBILL', Icons.move_to_inbox_outlined, 5),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(18),
@@ -136,6 +150,13 @@ class DashboardPage extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _quickAction(BuildContext context, String label, IconData icon, int destination) =>
+      FilledButton.tonalIcon(
+        onPressed: () => Shell.navigateTo(context, destination),
+        icon: Icon(icon),
+        label: Text(label),
+      );
 
   Widget _metric(BuildContext c, String title, String value, IconData icon) => Card(
     child: Padding(
