@@ -250,7 +250,22 @@ jobs:
           image = image.resize((N, N), Image.Resampling.LANCZOS)
           image.save("assets/icon/sbill_icon.png", "PNG", optimize=True)
           PY
-      - run: dart run flutter_launcher_icons
+      - name: Generate target launcher icons
+        shell: bash
+        run: |
+          cat > flutter_launcher_icons_job.yaml <<'YAML'
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: false
+            macos:
+              generate: false
+            windows:
+              generate: true
+              icon_size: 256
+            image_path: "assets/icon/sbill_icon.png"
+            min_sdk_android: 21
+          YAML
+          dart run flutter_launcher_icons -f flutter_launcher_icons_job.yaml
       - run: flutter build windows --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - name: Package Windows build
         shell: pwsh
@@ -365,7 +380,21 @@ jobs:
           image = image.resize((N, N), Image.Resampling.LANCZOS)
           image.save("assets/icon/sbill_icon.png", "PNG", optimize=True)
           PY
-      - run: dart run flutter_launcher_icons
+      - name: Generate target launcher icons
+        shell: bash
+        run: |
+          cat > flutter_launcher_icons_job.yaml <<'YAML'
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: false
+            macos:
+              generate: true
+            windows:
+              generate: false
+            image_path: "assets/icon/sbill_icon.png"
+            min_sdk_android: 21
+          YAML
+          dart run flutter_launcher_icons -f flutter_launcher_icons_job.yaml
       - run: flutter build macos --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
@@ -480,7 +509,22 @@ jobs:
           image = image.resize((N, N), Image.Resampling.LANCZOS)
           image.save("assets/icon/sbill_icon.png", "PNG", optimize=True)
           PY
-      - run: dart run flutter_launcher_icons
+      - name: Generate target launcher icons
+        shell: bash
+        run: |
+          cat > flutter_launcher_icons_job.yaml <<'YAML'
+          flutter_launcher_icons:
+            android: "launcher_icon"
+            ios: true
+            macos:
+              generate: false
+            windows:
+              generate: false
+            image_path: "assets/icon/sbill_icon.png"
+            min_sdk_android: 21
+            remove_alpha_ios: true
+          YAML
+          dart run flutter_launcher_icons -f flutter_launcher_icons_job.yaml
       - run: flutter build ios --no-codesign --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
