@@ -175,7 +175,10 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       return;
     }
     try {
-      await client.auth.resetPasswordForEmail(address);
+      await client.auth.resetPasswordForEmail(
+        address,
+        redirectTo: 'https://sbill-showcase.vercel.app/account.html',
+      );
       setState(() => message = 'Password reset email sent.');
     } on AuthException catch (e) {
       setState(() => message = e.message);
