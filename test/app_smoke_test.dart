@@ -7,7 +7,7 @@ import 'package:sbill/core/database/app_database.dart';
 
 void main() {
   testWidgets('SBILL app shell boots with the dashboard', (tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({'onboardingComplete': true});
     final prefs = await SharedPreferences.getInstance();
     final db = AppDatabase.forTesting();
     addTearDown(db.close);
