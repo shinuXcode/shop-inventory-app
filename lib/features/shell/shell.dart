@@ -53,12 +53,14 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 1000;
+    final width = MediaQuery.sizeOf(context).width;
+    final rail = width >= 900;
+    final extended = width >= 1200;
     return Scaffold(
       body: Row(children: [
-        if (wide) NavigationRail(
+        if (rail) NavigationRail(
           selectedIndex: index,
-          extended: MediaQuery.sizeOf(context).width >= 1200,
+          extended: extended,
           onDestinationSelected: _select,
           labelType: NavigationRailLabelType.all,
           leading: Padding(
@@ -75,10 +77,34 @@ class _ShellState extends State<Shell> {
             NavigationRailDestination(icon: Icon(icons[i]), label: Text(labels[i]))),
         ),
         Expanded(
-          child: IndexedStack(index: index, children: pages),
+          child: ClipRect(
+            child: Stack(
+              children: [
+                for (var i = 0; i < pages.length; i++)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      ignoring: i != index,
+                      child: AnimatedOpacity(
+                        opacity: i == index ? 1 : 0,
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        child: AnimatedSlide(
+                          offset: i == index
+                              ? Offset.zero
+                              : Offset(i < index ? -0.015 : 0.015, 0),
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          child: pages[i],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ]),
-      bottomNavigationBar: wide ? null : NavigationBar(
+      bottomNavigationBar: rail ? null : NavigationBar(
         selectedIndex: index,
         onDestinationSelected: _select,
         labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
