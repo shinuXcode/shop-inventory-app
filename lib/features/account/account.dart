@@ -443,6 +443,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                   ? 'S'
                   : (user!.email ?? 'S')[0].toUpperCase(),
             ),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
