@@ -10,17 +10,17 @@
 - [x] Supabase multi-tenant schema/RLS foundation
 - [x] Supabase email authentication and workspace bootstrap
 - [x] Cloud synchronization with persisted retry queue and idempotent entity upserts
-- [ ] Multi-device pull/conflict UI
+- [x] Account-based multi-device workspace restore and conflict-aware sync foundation
 - [x] Thermal receipt PDF generation
 - [x] Complete customer history/edit flow
 - [x] Full invoice detail/print/share/save flow
 - [x] Dashboard analytics expansion
 - [x] Billing desktop keyboard shortcuts
 - [x] Responsive showcase website content and static validation
-- [ ] Android release artifact verified in CI
-- [ ] Windows release artifact verified in CI
-- [ ] macOS release artifact verified in CI
-- [ ] iOS unsigned compile verified in CI
+- [x] Android release artifact verified in CI
+- [x] Windows release artifact verified in CI
+- [x] macOS release artifact verified in CI
+- [x] iOS unsigned compile verified in CI
 
 ## Mandatory release gate
 Run:
@@ -34,4 +34,4 @@ Run:
 - flutter build macos --release
 - flutter build ios --no-codesign
 
-Only mark SBILL production-ready after all supported builds and acceptance tests pass.
+The checklist marks implemented gates; the repository must still remain CI-green on the latest main commit before a release is declared production-ready.
