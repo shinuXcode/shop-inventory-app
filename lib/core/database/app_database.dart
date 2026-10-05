@@ -327,6 +327,7 @@ class AppDatabase extends _$AppDatabase {
           taxRate: Value(_rowDouble(row, const ['tax', 'tax_rate', 'gst'])),
           stockQuantity: Value(_rowInt(row, const ['stock', 'quantity', 'stock_quantity'])),
           lowStockThreshold: Value(_rowInt(row, const ['low_stock_threshold', 'reorder_level'], fallback: 5)),
+          createdAt: Value(existingItem?.createdAt ?? now),
           updatedAt: Value(now),
           isActive: const Value(true),
           syncStatus: const Value('pending'),
