@@ -11,14 +11,16 @@ final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) as
   final db = ref.watch(databaseProvider);
   final invoices = await db.recentInvoices(limit: 500);
   final lowStock = await db.lowStockCount();
-  return DashboardData(invoices: invoices, lowStock: lowStock);
+  final topSellers = await db.topSellingItems(limit: 5);
+  return DashboardData(invoices: invoices, lowStock: lowStock, topSellers: topSellers);
 });
 
 class DashboardData {
-  const DashboardData({required this.invoices, required this.lowStock});
+  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers});
 
   final List<Invoice> invoices;
   final int lowStock;
+  final List<TopSellingItem> topSellers;
 }
 
 class DashboardPage extends ConsumerWidget {
@@ -216,6 +218,44 @@ class DashboardPage extends ConsumerWidget {
                           }),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Top sellers', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 10),
+                      if (data.topSellers.isEmpty)
+                        const Text('No sales data yet.')
+                      else
+                        ...data.topSellers.asMap().entries.map((entry) {
+                          final seller = entry.value;
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(child: Text((entry.key + 1).toString())),
+                            title: Text(
+                              seller.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              seller.quantity % 1 == 0
+                                  ? seller.quantity.toStringAsFixed(0) + ' sold'
+                                  : seller.quantity.toStringAsFixed(2) + ' sold',
+                            ),
+                            trailing: Text(
+                              '₹' + (seller.totalMinor / 100).toStringAsFixed(2),
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          );
+                        }),
                     ],
                   ),
                 ),
