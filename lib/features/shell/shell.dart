@@ -81,7 +81,9 @@ class _ShellState extends State<Shell> {
           destinations: List.generate(labels.length, (i) =>
             NavigationRailDestination(icon: Icon(icons[i]), label: Text(labels[i]))),
         ),
-        Expanded(child: pages[index]),
+        Expanded(
+          child: IndexedStack(index: index, children: pages),
+        ),
       ]),
       bottomNavigationBar: wide ? null : NavigationBar(
         selectedIndex: index,
