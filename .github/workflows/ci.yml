@@ -7,9 +7,6 @@ on:
   pull_request:
     branches: [main]
 
-concurrency:
-  group: sbill-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
 
 env:
   FLUTTER_VERSION: 3.47.6
