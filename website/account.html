@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="SBILL account portal — use the same account as the SBILL app.">
+<title>Account — SBILL</title><link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="nav"><a class="brand" href="index.html"><span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 1024 1024"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2563EB"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient></defs><rect x="32" y="32" width="960" height="960" rx="220" fill="url(#g)"/><path d="M710 285c-70-73-184-105-303-78-121 27-194 96-194 188 0 106 74 151 205 187 134 36 199 60 199 121 0 60-61 101-154 101-83 0-150-29-207-89" fill="none" stroke="#fff" stroke-width="86" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>SBILL</span></a><nav><a href="index.html#features">Features</a><a href="support.html">Support</a><a href="founder.html">Founder</a></nav></header>
+<main class="section portal-page">
+<div class="portal-card">
+<p class="eyebrow">SBILL ACCOUNT</p><h1 class="portal-title">One account. Every SBILL surface.</h1>
+<p class="large">Use the same email and password as the Android, Windows, macOS and iOS app. Your account restores the cloud workspace; local billing remains on each device.</p>
+<div id="state" class="portal-state">Loading account…</div>
+<form id="authForm" class="portal-form">
+<label>Email<input id="email" type="email" autocomplete="email" required></label>
+<label>Password<input id="password" type="password" autocomplete="current-password" minlength="6" required></label>
+<div class="actions"><button class="primary" type="submit">Sign in</button><button class="secondary" type="button" id="signup">Create account</button></div>
+<button class="link-button" type="button" id="reset">Send password reset email</button>
+</form>
+<div id="accountCard" class="hidden">
+<div class="account-summary"><div><b id="accountEmail"></b><span id="workspaceName" class="muted"></span></div><button class="secondary" id="signout" type="button">Sign out</button></div>
+<div class="portal-grid">
+<a class="portal-tile" href="support.html"><b>Support</b><span>Create and track support requests using this account.</span></a>
+<a class="portal-tile" href="index.html#download"><b>Downloads</b><span>Choose platform builds published by the release pipeline.</span></a>
+</div></div>
+</div></main>
+<footer><b>SBILL</b> · Account Portal · <a href="founder.html">Founder</a></footer>
+<script type="module">
+import {getSupabase,getWorkspace} from './web-auth.js';
+const state=document.getElementById('state'), form=document.getElementById('authForm'), card=document.getElementById('accountCard');
+const email=document.getElementById('email'), password=document.getElementById('password');
+function note(text){state.textContent=text;}
+async function refresh(){
+  const supabase=await getSupabase();
+  if(!supabase){note('Cloud account is not configured on this website yet.');return;}
+  const {data:{user}}=await supabase.auth.getUser();
+  if(user){
+    form.classList.add('hidden'); card.classList.remove('hidden');
+    document.getElementById('accountEmail').textContent=user.email||'SBILL account';
+    const workspace=await getWorkspace();
+    document.getElementById('workspaceName').textContent=workspace?('Workspace: '+workspace.name):'No workspace linked yet';
+    note('Signed in.');
+  }else{
+    form.classList.remove('hidden');card.classList.add('hidden');note('Sign in to use the same account as the SBILL app.');
+  }
+}
+form.addEventListener('submit',async e=>{
+  e.preventDefault(); const supabase=await getSupabase(); if(!supabase){note('Cloud account is not configured.');return;}
+  try{await supabase.auth.signInWithPassword({email:email.value.trim(),password:password.value});note('Signed in.');await refresh();}catch(err){note(err.message||String(err));}
+});
+document.getElementById('signup').onclick=async()=>{
+  const supabase=await getSupabase(); if(!supabase){note('Cloud account is not configured.');return;}
+  try{const r=await supabase.auth.signUp({email:email.value.trim(),password:password.value});note(r.session?'Account created and signed in.':'Account created. Confirm your email, then sign in.');await refresh();}catch(err){note(err.message||String(err));}
+};
+document.getElementById('reset').onclick=async()=>{
+  const supabase=await getSupabase(); if(!supabase){note('Cloud account is not configured.');return;}
+  try{await supabase.auth.resetPasswordForEmail(email.value.trim());note('Password reset email sent.');}catch(err){note(err.message||String(err));}
+};
+document.getElementById('signout').onclick=async()=>{const supabase=await getSupabase();await supabase?.auth.signOut();await refresh();};
+refresh();
+</script>
+</body></html>
