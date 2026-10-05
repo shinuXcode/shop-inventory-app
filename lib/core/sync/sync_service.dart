@@ -23,13 +23,15 @@ class SyncService {
         unawaited(syncNow());
       });
     }
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(syncNow()));
+    if (CloudConfig.configured) {
+      _timer = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(syncNow()));
+    }
   }
 
   final AppDatabase db;
   late final StreamSubscription<List<ConnectivityResult>> _subscription;
   StreamSubscription<AuthState>? _authSubscription;
-  late final Timer _timer;
+  Timer? _timer;
   bool syncing = false;
   String? lastError;
 
@@ -328,6 +330,6 @@ class SyncService {
   void dispose() {
     _subscription.cancel();
     _authSubscription?.cancel();
-    _timer.cancel();
+    _timer?.cancel();
   }
 }
