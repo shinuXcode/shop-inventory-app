@@ -259,7 +259,22 @@ create policy "users can create own support tickets"
   );
 
 drop policy if exists "users can update own support tickets" on public.support_tickets;
-create policy "users can update own support tickets"
-  on public.support_tickets for update
-  using (user_id = auth.uid())
-  with check (user_id = auth.uid());
+
+create or replace function public.close_support_ticket(p_ticket_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+  update public.support_tickets
+  set status = 'closed', updated_at = now()
+  where id = p_ticket_id and user_id = auth.uid();
+end;
+$;
+
+revoke all on function public.close_support_ticket(uuid) from public;
+grant execute on function public.close_support_ticket(uuid) to authenticated;
