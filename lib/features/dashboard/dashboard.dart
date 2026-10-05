@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../app.dart';
 import '../shell/shell.dart';
+import '../migration/migration.dart';
 
 class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
@@ -81,7 +82,14 @@ class DashboardPage extends ConsumerWidget {
                       _quickAction(context, 'New bill', Icons.point_of_sale_outlined, 1),
                       _quickAction(context, 'Add product', Icons.add_box_outlined, 2),
                       _quickAction(context, 'Add customer', Icons.person_add_outlined, 3),
-                      _quickAction(context, 'Switch to SBILL', Icons.move_to_inbox_outlined, 5),
+                      FilledButton.tonalIcon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const MigrationPage()),
+                        ),
+                        icon: const Icon(Icons.move_to_inbox_outlined),
+                        label: const Text('Switch to SBILL'),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 18),
