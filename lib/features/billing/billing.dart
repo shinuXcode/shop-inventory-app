@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,7 +26,7 @@ class CartController extends Notifier<List<CartLine>> {
     final index = state.indexWhere((x) => x.id == id);
     if (index < 0) return;
     final line = state[index];
-    final nextQuantity = quantity.clamp(1, line.item.stockQuantity);
+    final nextQuantity = quantity.clamp(1, line.item.stockQuantity).toInt();
     final next = [...state];
     next[index] = line.copyWith(quantity: nextQuantity);
     state = next;
@@ -50,6 +52,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   String paymentMethod = 'cash';
   AppSettings? settings;
   bool busy = false;
+  Timer? _searchDebounce;
 
   @override void initState() {
     super.initState();
@@ -68,14 +71,46 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   @override void dispose() {
     search.dispose();
     discount.dispose();
+    _searchDebounce?.cancel();
     searchFocus.dispose();
     super.dispose();
   }
 
   Future<void> _search(String value) async {
-    final rows = await ref.read(databaseProvider).searchItems(value);
+    _searchDebounce?.cancel();
+    final query = value.trim();
+    if (query.isEmpty) {
+      setState(() {});
+      final rows = await ref.read(databaseProvider).searchItems('');
+      if (!mounted) return;
+      setState(() => results = rows);
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 140), () async {
+      final rows = await ref.read(databaseProvider).searchItems(query);
+      if (!mounted) return;
+      setState(() => results = rows);
+    });
+  }
+
+  Future<void> _quickBarcodeAdd(String value) async {
+    final query = value.trim();
+    if (query.isEmpty) return;
+    final rows = await ref.read(databaseProvider).searchItems(query);
     if (!mounted) return;
-    setState(() => results = rows);
+    final exact = rows.where((item) =>
+      item.barcode?.trim() == query || item.sku?.trim().toLowerCase() == query.toLowerCase()
+    ).toList();
+    if (exact.length == 1) {
+      ref.read(cartProvider.notifier).add(exact.first);
+      search.clear();
+      await _search('');
+      searchFocus.requestFocus();
+    } else if (exact.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No product matched that barcode or SKU.')),
+      );
+    }
   }
 
   BillingTotals _totals(List<CartLine> cart) => const BillingCalculator().calculate(
@@ -217,6 +252,8 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Text('Cart', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(width: 8),
+          if (cart.isNotEmpty) Chip(label: Text(cart.length.toString() + ' lines')),
           const Spacer(),
           if (cart.isNotEmpty)
             TextButton.icon(
