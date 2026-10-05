@@ -11,6 +11,7 @@ class AppSettings {
   String get businessAddress => _prefs.getString('businessAddress') ?? '';
   String get gstNumber => _prefs.getString('gstNumber') ?? '';
   String get invoicePrefix => _prefs.getString('invoicePrefix') ?? 'INV';
+  String get invoiceFooter => _prefs.getString('invoiceFooter') ?? 'Thank you for your business.';
   String get currency => _prefs.getString('currency') ?? 'INR';
   bool get thermalReceipt => _prefs.getBool('thermalReceipt') ?? false;
   bool get darkMode => _prefs.getBool('darkMode') ?? false;
@@ -26,6 +27,7 @@ class AppSettings {
     required String invoicePrefix,
     required bool thermalReceipt,
     required bool darkMode,
+    String invoiceFooter = 'Thank you for your business.',
     String? businessId,
   }) async {
     await _prefs.setString('businessName', businessName);
@@ -36,6 +38,7 @@ class AppSettings {
     await _prefs.setString('invoicePrefix', invoicePrefix);
     await _prefs.setBool('thermalReceipt', thermalReceipt);
     await _prefs.setBool('darkMode', darkMode);
+    await _prefs.setString('invoiceFooter', invoiceFooter.trim().isEmpty ? 'Thank you for your business.' : invoiceFooter.trim());
     if (businessId != null && businessId.isNotEmpty) {
       await _prefs.setString('businessId', businessId);
     }
