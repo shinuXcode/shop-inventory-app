@@ -60,33 +60,59 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   Future<void> _bindCurrentAccount() async {
     final current = client.auth.currentUser;
     if (current == null) return;
-    if (settings.accountUserId != current.id) {
+
+    final previousUserId = settings.accountUserId;
+    if (previousUserId != null && previousUserId != current.id) {
+      await ref.read(databaseProvider).clearLocalData();
       await settings.clearCloudBinding();
+    }
+    if (previousUserId != current.id) {
       await prefs.setString('accountUserId', current.id);
       settings = AppSettings(prefs);
     }
 
-    if (settings.businessId == null) {
-      final memberships = await client
-          .from('business_members')
-          .select('business_id')
-          .eq('user_id', current.id);
+    final memberships = await client
+        .from('business_members')
+        .select('business_id')
+        .eq('user_id', current.id);
 
-      if (memberships.isNotEmpty) {
-        final businessId = memberships.first['business_id']?.toString();
-        if (businessId != null && businessId.isNotEmpty) {
-          await _selectWorkspace(businessId, syncAfter: true);
-        }
-      }
-    } else {
-      await _loadRemoteBusiness(settings.businessId!);
+    final allowedIds = memberships
+        .map((row) => row['business_id']?.toString())
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    final selectedBusinessId = settings.businessId;
+    if (selectedBusinessId != null && allowedIds.contains(selectedBusinessId)) {
+      await _loadRemoteBusiness(selectedBusinessId);
       await ref.read(syncServiceProvider).syncNow();
+    } else if (allowedIds.isNotEmpty) {
+      if (selectedBusinessId != null) {
+        await ref.read(databaseProvider).clearLocalData();
+      }
+      final businessId = allowedIds.first;
+      await _selectWorkspace(businessId, syncAfter: true);
+    } else {
+      await settings.clearCloudBinding();
     }
 
     if (mounted) setState(() {});
   }
 
   Future<void> _selectWorkspace(String businessId, {bool syncAfter = false}) async {
+    final current = client.auth.currentUser;
+    if (current == null) throw StateError('Sign in required.');
+    final membership = await client
+        .from('business_members')
+        .select('business_id')
+        .eq('business_id', businessId)
+        .eq('user_id', current.id)
+        .maybeSingle();
+    if (membership == null) throw StateError('That workspace is not available to this account.');
+
+    if (settings.businessId != null && settings.businessId != businessId) {
+      await ref.read(databaseProvider).clearLocalData();
+    }
     await prefs.setString('businessId', businessId);
     settings = AppSettings(prefs);
     await _loadRemoteBusiness(businessId);
