@@ -5,6 +5,7 @@ import '../../app.dart';
 import '../../core/pdf/invoice_pdf_service.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/database/app_database.dart';
+import '../../core/widgets/user_facing_error.dart';
 
 class InvoicesPage extends ConsumerStatefulWidget {
   const InvoicesPage({super.key});
@@ -43,7 +44,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         if (s.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (s.hasError) return Center(child: Text('Failed to load invoices: ' + s.error.toString()));
+        if (s.hasError) return Center(child: Text(userFacingError(s.error, fallback: 'Invoices are temporarily unavailable. Please try again.')));
         final list = s.data ?? const <Invoice>[];
         if (list.isEmpty) return const Center(child: Text('No invoices yet.'));
         return ListView.separated(
