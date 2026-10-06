@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/widgets/sbill_logo.dart';
+import '../../core/cloud/cloud_config.dart';
+import '../../core/widgets/user_facing_error.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -11,19 +13,21 @@ class AboutPage extends StatelessWidget {
   static const portfolioV2 = 'https://mohammad-sadab-portfolio-v2.vercel.app/';
   static const portfolio = 'https://sadab01.vercel.app/';
   static const github = 'https://github.com/shinuXcode/shop-inventory-app';
+  static const version = '1.2.0';
+  static const build = '3';
 
   Future<void> _open(BuildContext context, String url) async {
     try {
       final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       if (!ok && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open $url')),
+          const SnackBar(content: Text('That link could not be opened. Please try again.')),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open link: $e')),
+          SnackBar(content: Text(userFacingError(e, fallback: 'That link could not be opened. Please try again.'))),
         );
       }
     }
@@ -75,7 +79,28 @@ class AboutPage extends StatelessWidget {
               _link(context, 'Founder Portfolio V2', portfolioV2, portfolioV2, Icons.web_outlined),
               _link(context, 'Founder Portfolio', portfolio, portfolio, Icons.public_outlined),
               _link(context, 'GitHub Repository', 'SBILL source code and releases', github, Icons.code_outlined),
+              _link(context, 'Support Center', 'Create or track a support request', 'https://sbill-showcase.vercel.app/support.html', Icons.support_agent_outlined),
               const SizedBox(height: 18),
+              Card(
+                child: Column(
+                  children: [
+                    const ListTile(
+                      leading: Icon(Icons.info_outline),
+                      title: Text('Version'),
+                      subtitle: Text('SBILL 1.2.0 (build 3)'),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.sync_outlined),
+                      title: const Text('Account & sync'),
+                      subtitle: Text(
+                        CloudConfig.configured
+                            ? 'Cloud account features are configured for this build. Manage sign-in and workspace sync from Account & Sync.'
+                            : 'Cloud account is not configured in this build. SBILL continues to work offline.',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(18),
