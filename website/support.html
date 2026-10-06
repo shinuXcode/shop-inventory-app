@@ -15,13 +15,21 @@
 <button class="primary" type="submit">Send support request</button>
 </form>
 <div id="tickets"></div>
+<div class="support-contacts">
+  <div class="support-contact-grid">
+    <a class="portal-tile" href="mailto:mrsadabflight@gmail.com?subject=SBILL%20Support"><b>Email support</b><span>Send a private support email.</span></a>
+    <a class="portal-tile" href="https://wa.me/917366815917?text=Hello%20SBILL%20Support"><b>WhatsApp support</b><span>Open a direct WhatsApp chat.</span></a>
+    <a class="portal-tile" href="tel:+917366815917" aria-label="Call SBILL support"><b>Call support</b><span>Start a call without displaying the support number.</span></a>
+  </div>
+</div>
 </div></main>
 <footer><b>SBILL</b> · Support · <a href="account.html">Account</a></footer>
 <script type="module">
-import {getSupabase,listTickets,createTicket} from './web-auth.js';
+import {getSupabase,listTickets,createTicket,friendlyError,getWorkspace} from './web-auth.js';
 const notice=document.getElementById('notice'), form=document.getElementById('ticketForm'), tickets=document.getElementById('tickets');
 async function render(){
- const supabase=await getSupabase(); if(!supabase){notice.textContent='Cloud account is not configured on this website yet.';return;}
+ const supabase=await getSupabase();
+ if(!supabase){notice.textContent='Support is temporarily unavailable. You can still use SBILL offline.';return;}
  const {data:{user}}=await supabase.auth.getUser();
  if(!user){notice.textContent='Sign in to your SBILL account to create and track support requests.';return;}
  form.classList.remove('hidden'); notice.textContent='Signed in as '+(user.email||'SBILL account')+'.';
@@ -36,7 +44,22 @@ async function render(){
 }
 function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
 form.addEventListener('submit',async e=>{
- e.preventDefault(); try{await createTicket({category:document.getElementById('category').value,subject:document.getElementById('subject').value.trim(),message:document.getElementById('message').value.trim(),priority:'normal'});form.reset();notice.textContent='Support request submitted.';await render();}catch(err){notice.textContent=err.message||String(err);}
+ e.preventDefault();
+ try{
+   const workspace=await getWorkspace();
+   await createTicket({
+     category:document.getElementById('category').value,
+     subject:document.getElementById('subject').value.trim(),
+     message:document.getElementById('message').value.trim(),
+     priority:'normal',
+     business_id:workspace?.id ?? null
+   });
+   form.reset();
+   notice.textContent='Support request submitted.';
+   await render();
+ }catch(err){
+   notice.textContent=friendlyError(err,'Your support request could not be submitted. Please try again.');
+ }
 });
 render();
 </script>
