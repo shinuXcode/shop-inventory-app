@@ -148,6 +148,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         LogicalKeySet(LogicalKeyboardKey.f8): const _BillingActionIntent('hold'),
         LogicalKeySet(LogicalKeyboardKey.f9): const _BillingActionIntent('payment'),
         LogicalKeySet(LogicalKeyboardKey.f12): const _BillingActionIntent('checkout'),
+        LogicalKeySet(LogicalKeyboardKey.escape): const _BillingActionIntent('escape'),
       },
       child: Actions(
         actions: <Type, Action<Intent>>{
@@ -159,6 +160,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
                 case 'hold': _holdCart(); break;
                 case 'payment': _paymentDialog(); break;
                 case 'checkout': _checkout(); break;
+                case 'escape': _escapeBilling(); break;
               }
               return null;
             },
@@ -202,6 +204,16 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         ),
       ),
     );
+  }
+
+  void _escapeBilling() {
+    if (search.text.isNotEmpty) {
+      search.clear();
+      _search('');
+      searchFocus.requestFocus();
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   Widget _products() => Column(children: [
@@ -277,6 +289,21 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       ]),
     ),
   );
+
+  Future<void> _confirmClearCart() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Clear current cart?'),
+        content: const Text('The current cart will be removed. A held cart is kept separately.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Keep cart')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Clear cart')),
+        ],
+      ),
+    );
+    if (confirmed == true) ref.read(cartProvider.notifier).clear();
+  }
 
   Widget _cartLine(CartLine line) => ListTile(
     contentPadding: EdgeInsets.zero,
@@ -499,7 +526,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Checkout failed: ' + e.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checkout could not be completed. Your cart is still safe.')));
     } finally {
       if (mounted) setState(() => busy = false);
     }
