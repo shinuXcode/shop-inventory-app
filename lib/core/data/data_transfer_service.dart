@@ -35,7 +35,7 @@ class ImportPreview {
 
 class DataTransferService {
   static Future<ImportPreview?> pick() async {
-    final result = await FilePicker.pickFiles(
+    final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'json', 'txt'],
       allowMultiple: false,
