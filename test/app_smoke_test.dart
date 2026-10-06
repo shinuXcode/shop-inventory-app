@@ -28,5 +28,11 @@ void main() {
     expect(find.text('Today’s sales'), findsOneWidget);
     expect(find.text('Invoices today'), findsOneWidget);
     expect(find.text('Low-stock items'), findsOneWidget);
+
+    // Dispose ProviderScope before closing the in-memory Drift database so
+    // Drift stream-query cleanup can schedule and flush its close timer.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
   });
 }
