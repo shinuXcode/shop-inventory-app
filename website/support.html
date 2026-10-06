@@ -25,7 +25,7 @@
 </div></main>
 <footer><b>SBILL</b> · Support · <a href="account.html">Account</a></footer>
 <script type="module">
-import {getSupabase,listTickets,createTicket,friendlyError,getWorkspace} from './web-auth.js';
+import {getSupabase,listTickets,createTicket,closeTicket,friendlyError,getWorkspace} from './web-auth.js';
 const notice=document.getElementById('notice'), form=document.getElementById('ticketForm'), tickets=document.getElementById('tickets');
 async function render(){
  const supabase=await getSupabase();
@@ -38,10 +38,18 @@ async function render(){
  for(const t of rows){
   const el=document.createElement('article'); el.className='ticket';
   const reply=t.admin_reply?('<div class="ticket-reply"><b>Support reply</b><p>'+escapeHtml(t.admin_reply)+'</p></div>'):'';
-  el.innerHTML='<div class="ticket-head"><b>'+escapeHtml(t.subject)+'</b><span>'+escapeHtml(t.status)+'</span></div><p>'+escapeHtml(t.message)+'</p>'+reply;
+  const closeAction = t.status === 'closed' ? '' : '<button class="secondary ticket-close" data-id="'+escapeHtml(t.id)+'" type="button">Close request</button>';
+  el.innerHTML='<div class="ticket-head"><b>'+escapeHtml(t.subject)+'</b><span>'+escapeHtml(t.status)+'</span></div><p>'+escapeHtml(t.message)+'</p>'+reply+closeAction;
   tickets.appendChild(el);
  }
 }
+tickets.addEventListener('click',async event=>{
+ const button=event.target.closest('.ticket-close');
+ if(!button) return;
+ button.disabled=true;
+ try{await closeTicket(button.dataset.id);notice.textContent='Support request closed.';await render();}
+ catch(err){notice.textContent=friendlyError(err,'The request could not be closed. Please try again.');button.disabled=false;}
+});
 function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
 form.addEventListener('submit',async e=>{
  e.preventDefault();
