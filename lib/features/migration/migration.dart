@@ -170,7 +170,7 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Switch to SBILL', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                        Text('Migration Center', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                         const SizedBox(height: 6),
                         const Text('Import your products and customers before making your first bill. SBILL keeps the imported data local first.'),
                         const SizedBox(height: 16),
@@ -249,6 +249,7 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
                 Text('… and ' + (value.validationErrors.length - 6).toString() + ' more.', style: Theme.of(context).textTheme.bodySmall),
             ],
             if (value.isValid && value.kind != 'backup' && value.rows.isNotEmpty) ...[
+
               const SizedBox(height: 8),
               Text(
                 duplicateCount == 0
@@ -262,6 +263,15 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
                 style: Theme.of(context).textTheme.bodySmall,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            if (value.kind == 'backup' && value.isValid) ...[
+              const SizedBox(height: 8),
+              Text(
+                duplicateCount == 0
+                    ? 'No matching backup records found in the current database.'
+                    : duplicateCount.toString() + ' backup record(s) already exist and will be skipped.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
             if (value.rows.isNotEmpty) ...[
@@ -289,10 +299,11 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
                 OutlinedButton.icon(
                   onPressed: null,
                   icon: const Icon(Icons.error_outline),
-                  label: Text('Fix ' + value.validationErrors.length.toString() + ' validation error(s) first'),
+                  label: Text(
+                    'Fix ' + value.validationErrors.length.toString() + ' validation error(s) first',
+                  ),
                 ),
-
-];
+            ],
           ],
         ),
       ),
