@@ -51,7 +51,7 @@ class AppSettings {
   }
 
   Future<void> clearCloudBinding() async {
+    // Preserve accountUserId so the app can distinguish the same user from a new user after sign-out.
     await _prefs.remove('businessId');
-    await _prefs.remove('accountUserId');
   }
 }
