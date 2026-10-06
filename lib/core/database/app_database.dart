@@ -113,6 +113,30 @@ class AppDatabase extends _$AppDatabase {
     )).get();
   }
 
+
+  Future<Item?> findItemConflict({
+    required String sku,
+    required String barcode,
+    String? excludingId,
+  }) async {
+    final normalizedSku = sku.trim().toLowerCase();
+    final normalizedBarcode = barcode.trim();
+    if (normalizedSku.isEmpty && normalizedBarcode.isEmpty) return null;
+    final rows = await select(items).get();
+    for (final item in rows) {
+      if (item.id == excludingId) continue;
+      if (normalizedSku.isNotEmpty &&
+          (item.sku ?? '').trim().toLowerCase() == normalizedSku) {
+        return item;
+      }
+      if (normalizedBarcode.isNotEmpty &&
+          (item.barcode ?? '').trim() == normalizedBarcode) {
+        return item;
+      }
+    }
+    return null;
+  }
+
   Future<void> saveItem(ItemsCompanion item) async {
     await into(items).insertOnConflictUpdate(item);
     await into(syncQueue).insert(SyncQueueCompanion.insert(
@@ -378,25 +402,22 @@ class AppDatabase extends _$AppDatabase {
           isActive: const Value(true),
           syncStatus: const Value('pending'),
         );
-        if (existingItem == null) {
-          await into(items).insert(
-            ItemsCompanion.insert(
-              id: id,
-              sku: companion.sku,
-              name: name,
-              priceMinor: companion.priceMinor.value,
-              taxRate: companion.taxRate,
-              stockQuantity: companion.stockQuantity,
-              lowStockThreshold: companion.lowStockThreshold,
-              category: companion.category,
-              barcode: companion.barcode,
-              createdAt: now,
-              updatedAt: now,
-            ),
-          );
-        } else {
-          await into(items).insertOnConflictUpdate(companion);
-        }
+        if (existingItem != null) continue;
+        await into(items).insert(
+          ItemsCompanion.insert(
+            id: id,
+            sku: companion.sku,
+            name: name,
+            priceMinor: companion.priceMinor.value,
+            taxRate: companion.taxRate,
+            stockQuantity: companion.stockQuantity,
+            lowStockThreshold: companion.lowStockThreshold,
+            category: companion.category,
+            barcode: companion.barcode,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
         await into(syncQueue).insert(SyncQueueCompanion.insert(
           entityType: 'item', entityId: id, operation: 'upsert', createdAt: now,
         ));
@@ -445,22 +466,19 @@ class AppDatabase extends _$AppDatabase {
           updatedAt: Value(now),
           syncStatus: const Value('pending'),
         );
-        if (existingCustomer == null) {
-          await into(customers).insert(
-            CustomersCompanion.insert(
-              id: id,
-              name: name,
-              phone: companion.phone,
-              email: companion.email,
-              address: companion.address,
-              notes: companion.notes,
-              createdAt: now,
-              updatedAt: now,
-            ),
-          );
-        } else {
-          await into(customers).insertOnConflictUpdate(companion);
-        }
+        if (existingCustomer != null) continue;
+        await into(customers).insert(
+          CustomersCompanion.insert(
+            id: id,
+            name: name,
+            phone: companion.phone,
+            email: companion.email,
+            address: companion.address,
+            notes: companion.notes,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
         await into(syncQueue).insert(SyncQueueCompanion.insert(
           entityType: 'customer', entityId: id, operation: 'upsert', createdAt: now,
         ));
