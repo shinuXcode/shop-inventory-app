@@ -31,7 +31,7 @@
 </div></main>
 <footer><b>SBILL</b> · Account Portal · <a href="founder.html">Founder</a></footer>
 <script type="module">
-import {getSupabase,getWorkspace} from './web-auth.js';
+import {getSupabase,getWorkspace,friendlyError} from './web-auth.js';
 const state=document.getElementById('state'), form=document.getElementById('authForm'), card=document.getElementById('accountCard');
 const email=document.getElementById('email'), password=document.getElementById('password');
 function note(text){state.textContent=text;}
@@ -52,21 +52,21 @@ async function refresh(){
 }
 form.addEventListener('submit',async e=>{
   e.preventDefault(); const supabase=await getSupabase(); if(!supabase){note('Cloud account is not configured.');return;}
-  try{await supabase.auth.signInWithPassword({email:email.value.trim(),password:password.value});note('Signed in.');await refresh();}catch(err){note(err.message||String(err));}
+  try{await supabase.auth.signInWithPassword({email:email.value.trim(),password:password.value});note('Signed in.');await refresh();}catch(err){note(friendlyError(err, 'Account action could not be completed. Please try again.'));}
 });
 document.getElementById('signup').onclick=async()=>{
   const supabase=await getSupabase(); if(!supabase){note('Cloud account is not configured.');return;}
-  try{const r=await supabase.auth.signUp({email:email.value.trim(),password:password.value});note(r.session?'Account created and signed in.':'Account created. Confirm your email, then sign in.');await refresh();}catch(err){note(err.message||String(err));}
+  try{const r=await supabase.auth.signUp({email:email.value.trim(),password:password.value});note(r.session?'Account created and signed in.':'Account created. Confirm your email, then sign in.');await refresh();}catch(err){note(friendlyError(err, 'Account action could not be completed. Please try again.'));}
 };
 document.getElementById('reset').onclick=async()=>{
   const supabase=await getSupabase(); if(!supabase){note('Cloud account is not configured.');return;}
-  try{await supabase.auth.resetPasswordForEmail(email.value.trim());note('Password reset email sent.');}catch(err){note(err.message||String(err));}
+  try{await supabase.auth.resetPasswordForEmail(email.value.trim());note('Password reset email sent.');}catch(err){note(friendlyError(err, 'Account action could not be completed. Please try again.'));}
 };
 document.getElementById('createWorkspace').onclick=async()=>{
   const supabase=await getSupabase(); const name=document.getElementById('businessName').value.trim();
   if(!supabase || !name){note('Enter a business name.');return;}
   try{await supabase.rpc('create_business',{p_name:name,p_phone:null,p_address:null,p_gst_number:null,p_currency:'INR',p_invoice_prefix:'INV'});note('Workspace created.');await refresh();}
-  catch(err){note(err.message||String(err));}
+  catch(err){note(friendlyError(err, 'Account action could not be completed. Please try again.'));}
 };
 document.getElementById('signout').onclick=async()=>{const supabase=await getSupabase();await supabase?.auth.signOut();await refresh();};
 refresh();
