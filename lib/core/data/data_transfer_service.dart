@@ -16,6 +16,7 @@ class ImportPreview {
     required this.rows,
     this.snapshot,
     this.error,
+    this.validationErrors = const [],
   });
 
   final String fileName;
@@ -23,6 +24,7 @@ class ImportPreview {
   final List<Map<String, String>> rows;
   final Map<String, dynamic>? snapshot;
   final String? error;
+  final List<String> validationErrors;
 
   bool get isValid => error == null;
   String get label => switch (kind) {
@@ -61,26 +63,40 @@ class DataTransferService {
           );
         }
         final rows = _rowsFromJson(decoded);
+        final kind = _inferKind(rows);
+        final validationErrors = _validateRows(kind, rows);
         return ImportPreview(
           fileName: fileName,
-          kind: _inferKind(rows),
+          kind: kind,
           rows: rows,
-          error: rows.isEmpty ? 'No importable rows were found.' : null,
+          error: rows.isEmpty
+              ? 'No importable rows were found.'
+              : kind == 'unknown'
+                  ? 'We could not identify product or customer columns.'
+                  : null,
+          validationErrors: validationErrors,
         );
       }
       final rows = parseDelimited(text);
+      final kind = _inferKind(rows);
+      final validationErrors = _validateRows(kind, rows);
       return ImportPreview(
         fileName: fileName,
-        kind: _inferKind(rows),
+        kind: kind,
         rows: rows,
-        error: rows.isEmpty ? 'No importable rows were found.' : null,
+        error: rows.isEmpty
+            ? 'No importable rows were found.'
+            : kind == 'unknown'
+                ? 'We could not identify product or customer columns.'
+                : null,
+        validationErrors: validationErrors,
       );
     } catch (e) {
       return ImportPreview(
         fileName: fileName,
         kind: 'unknown',
         rows: const [],
-        error: 'Could not read file: ' + e.toString(),
+        error: 'We could not read that file. Check the file format and try again.',
       );
     }
   }
@@ -218,6 +234,59 @@ class DataTransferService {
       }
     }
     return const [];
+  }
+
+  static List<String> _validateRows(String kind, List<Map<String, String>> rows) {
+    final errors = <String>[];
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      final number = i + 2;
+      if (kind == 'products') {
+        final name = _rowValue(row, const ['name', 'product', 'product_name', 'item_name']);
+        if (name.isEmpty) {
+          errors.add('Row ' + number.toString() + ': product name is missing.');
+          continue;
+        }
+        final priceText = _rowValue(row, const ['price', 'price_rupees', 'selling_price', 'rate']);
+        final taxText = _rowValue(row, const ['tax', 'tax_rate', 'gst']);
+        final stockText = _rowValue(row, const ['stock', 'quantity', 'stock_quantity']);
+        final price = double.tryParse(priceText.replaceAll(RegExp(r'[^0-9.\-]'), ''));
+        final tax = double.tryParse(taxText.replaceAll(RegExp(r'[^0-9.\-]'), ''));
+        final stock = int.tryParse(stockText.isEmpty ? '0' : stockText);
+        if (price == null || !price.isFinite || price < 0) errors.add('Row ' + number.toString() + ': price must be a valid non-negative number.');
+        if (tax == null || !tax.isFinite || tax < 0 || tax > 100) errors.add('Row ' + number.toString() + ': tax must be between 0 and 100%.');
+        if (stock == null || stock < 0) errors.add('Row ' + number.toString() + ': stock must be a non-negative integer.');
+      } else if (kind == 'customers') {
+        final name = _rowValue(row, const ['name', 'customer', 'customer_name']);
+        if (name.isEmpty) errors.add('Row ' + number.toString() + ': customer name is missing.');
+      }
+    }
+    return errors;
+  }
+
+  static List<String> _validateBackup(Map<String, dynamic> snapshot) {
+    final errors = <String>[];
+    final items = (snapshot['items'] as List?)?.whereType<Map>().toList() ?? const [];
+    final customers = (snapshot['customers'] as List?)?.whereType<Map>().toList() ?? const [];
+    for (var i = 0; i < items.length; i++) {
+      if ((items[i]['id']?.toString().trim() ?? '').isEmpty || (items[i]['name']?.toString().trim() ?? '').isEmpty) {
+        errors.add('Backup product row ' + (i + 1).toString() + ': required identity is missing.');
+      }
+    }
+    for (var i = 0; i < customers.length; i++) {
+      if ((customers[i]['id']?.toString().trim() ?? '').isEmpty || (customers[i]['name']?.toString().trim() ?? '').isEmpty) {
+        errors.add('Backup customer row ' + (i + 1).toString() + ': required identity is missing.');
+      }
+    }
+    return errors;
+  }
+
+  static String _rowValue(Map<String, String> row, List<String> keys) {
+    for (final key in keys) {
+      final value = row[key];
+      if (value != null && value.trim().isNotEmpty) return value.trim();
+    }
+    return '';
   }
 
   static Map<String, String> _normalizeMap(Map value) => value.map(
