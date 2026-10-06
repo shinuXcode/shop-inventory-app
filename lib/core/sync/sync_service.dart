@@ -79,11 +79,10 @@ class SyncService {
       }
     } catch (e) {
       lastError = e.toString();
-      final prefs = await SharedPreferences.getInstance();
+    } finally {
       if (lastError == null) {
         await prefs.setString('lastSyncAt', DateTime.now().toUtc().toIso8601String());
       }
-    } finally {
       syncing = false;
     }
   }
