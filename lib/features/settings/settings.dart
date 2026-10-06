@@ -28,6 +28,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final invoiceFooter = TextEditingController();
   bool thermal = false;
   bool dark = false;
+  String currency = 'INR';
   bool loading = true;
 
   @override
@@ -48,6 +49,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     invoiceFooter.text = settings.invoiceFooter;
     thermal = settings.thermalReceipt;
     dark = settings.darkMode;
+    currency = settings.currency;
     if (mounted) setState(() => loading = false);
   }
 
@@ -61,6 +63,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       invoicePrefix: prefix.text.trim().isEmpty ? 'INV' : prefix.text.trim(),
       thermalReceipt: thermal,
       darkMode: dark,
+      currency: currency,
       invoiceFooter: invoiceFooter.text.trim(),
     );
     await ref.read(themeModeProvider.notifier).setDarkMode(dark);
@@ -90,162 +93,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     }
   }
 
-  Future<void> _cloudAuth() async {
-    if (!CloudConfig.configured) {
-      _showMessage('Build with SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to enable cloud sync.');
-      return;
-    }
-    final emailController = TextEditingController(text: email.text.trim());
-    final passwordController = TextEditingController();
-    final createAccount = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Cloud account'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(
-            controller: emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Email'),
-          ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Password'),
-          ),
-        ]),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Sign in')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Create account')),
-        ],
-      ),
-    );
-    if (createAccount == null) return;
-    final client = Supabase.instance.client;
-    try {
-      if (createAccount) {
-        final result = await client.auth.signUp(
-          email: emailController.text.trim(),
-          password: passwordController.text,
-        );
-        if (result.session == null) {
-          _showMessage('Account created. Confirm your email if email confirmation is enabled.');
-        } else {
-          _showMessage('Cloud account created and signed in.');
-        }
-      } else {
-        await client.auth.signInWithPassword(
-          email: emailController.text.trim(),
-          password: passwordController.text,
-        );
-        _showMessage('Signed in as ' + emailController.text.trim());
-      }
-      await _loadExistingWorkspace();
-      if (mounted) setState(() {});
-    } on AuthException catch (e) {
-      _showMessage(e.message);
-    } catch (e) {
-      _showMessage('Cloud authentication failed: ' + e.toString());
-    }
-  }
-
-  Future<void> _loadExistingWorkspace() async {
-    if (!_signedIn || settings.businessId != null) return;
-    try {
-      final client = Supabase.instance.client;
-      final user = client.auth.currentUser;
-      if (user == null) return;
-      final rows = await client
-          .from('business_members')
-          .select('business_id')
-          .eq('user_id', user.id);
-      if (rows.isEmpty) return;
-      final id = rows.first['business_id']?.toString();
-      if (id == null || id.isEmpty) return;
-      await _prefs.setString('businessId', id);
-      if (mounted) setState(() {});
-    } catch (e) {
-      _showMessage('Workspace discovery failed: ' + e.toString());
-    }
-  }
-
-  Future<void> _createBusiness() async {
-    if (!_signedIn) {
-      await _cloudAuth();
-      if (!_signedIn) return;
-    }
-    final name = TextEditingController(text: business.text);
-    final id = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: const Text('Create workspace'),
-          content: TextField(
-            controller: name,
-            autofocus: true,
-            onChanged: (_) => setDialogState(() {}),
-            decoration: const InputDecoration(labelText: 'Business name'),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: name.text.trim().isEmpty ? null : () => Navigator.pop(dialogContext, name.text.trim()),
-              child: const Text('Create'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (id == null || id.isEmpty) return;
-    try {
-      final client = Supabase.instance.client;
-      final result = await client.rpc('create_business', params: {
-        'p_name': id,
-        'p_phone': phone.text.trim().isEmpty ? null : phone.text.trim(),
-        'p_address': address.text.trim().isEmpty ? null : address.text.trim(),
-        'p_gst_number': gst.text.trim().isEmpty ? null : gst.text.trim(),
-        'p_currency': 'INR',
-        'p_invoice_prefix': prefix.text.trim().isEmpty ? 'INV' : prefix.text.trim(),
-      });
-      await settings.save(
-        businessName: id,
-        businessPhone: phone.text.trim(),
-        businessEmail: email.text.trim(),
-        businessAddress: address.text.trim(),
-        gstNumber: gst.text.trim(),
-        invoicePrefix: prefix.text.trim().isEmpty ? 'INV' : prefix.text.trim(),
-        thermalReceipt: thermal,
-        darkMode: dark,
-        businessId: result.toString(),
-      );
-      if (mounted) {
-        _showMessage('Workspace created. Local changes can now sync.');
-        setState(() {});
-      }
-    } catch (e) {
-      _showMessage('Workspace creation failed: ' + e.toString());
-    }
-  }
-
-  Future<void> _syncNow() async {
-    if (!settings.cloudConfigured) {
-      _showMessage('Create a cloud workspace first.');
-      return;
-    }
-    await ref.read(syncServiceProvider).syncNow();
-    _showMessage('Sync completed' + (ref.read(syncServiceProvider).lastError == null ? '.' : ' with retryable errors.'));
-  }
-
-  Future<void> _signOut() async {
-    if (!CloudConfig.configured) return;
-    await Supabase.instance.client.auth.signOut();
-    if (mounted) setState(() {});
-  }
-
-  void _showMessage(String message) {
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
   @override
   Widget build(BuildContext context) {
     if (loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -270,6 +117,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           TextField(controller: gst, decoration: const InputDecoration(labelText: 'GST number')),
           const SizedBox(height: 10),
           TextField(controller: prefix, decoration: const InputDecoration(labelText: 'Invoice prefix')),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            initialValue: currency,
+            decoration: const InputDecoration(labelText: 'Currency'),
+            items: const [
+              DropdownMenuItem(value: 'INR', child: Text('INR — Indian Rupee')),
+              DropdownMenuItem(value: 'USD', child: Text('USD — US Dollar')),
+              DropdownMenuItem(value: 'EUR', child: Text('EUR — Euro')),
+              DropdownMenuItem(value: 'GBP', child: Text('GBP — Pound Sterling')),
+            ],
+            onChanged: (value) => setState(() => currency = value ?? 'INR'),
+          ),
           const SizedBox(height: 10),
           TextField(
             controller: invoiceFooter,
@@ -298,7 +157,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           Card(
             child: ListTile(
               leading: const Icon(Icons.move_to_inbox_outlined),
-              title: const Text('Switch to SBILL / Migration Center'),
+              title: const Text('Migration Center'),
               subtitle: const Text('Import products and customers, or restore a complete SBILL backup.'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MigrationPage())),
