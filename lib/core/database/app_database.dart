@@ -501,11 +501,24 @@ class AppDatabase extends _$AppDatabase {
     final invoiceRows = (snapshot['invoices'] as List?)?.whereType<Map>().toList() ?? const [];
     final invoiceItemRows = (snapshot['invoiceItems'] as List?)?.whereType<Map>().toList() ?? const [];
 
+    var imported = 0;
+    final importedItemIds = <String>[];
+    final importedCustomerIds = <String>[];
+    final importedInvoiceIds = <String>[];
+    final now = DateTime.now();
+
     await transaction(() async {
+      final existingItemIds = (await select(items).get()).map((row) => row.id).toSet();
+      final existingCustomerIds = (await select(customers).get()).map((row) => row.id).toSet();
+      final existingInvoiceIds = (await select(invoices).get()).map((row) => row.id).toSet();
+      final existingInvoiceItemIds = (await select(invoiceItems).get()).map((row) => row.id).toSet();
+
       for (final row in itemRows) {
-        final now = _rowDate(row['updatedAt']) ?? DateTime.now();
-        await into(items).insertOnConflictUpdate(ItemsCompanion(
-          id: Value(row['id'].toString()),
+        final id = row['id'].toString();
+        if (existingItemIds.contains(id)) continue;
+        final createdNow = _rowDate(row['updatedAt']) ?? now;
+        await into(items).insert(ItemsCompanion(
+          id: Value(id),
           sku: Value(_nullable(row['sku'])),
           name: Value(row['name'].toString()),
           description: Value(_nullable(row['description'])),
@@ -517,29 +530,37 @@ class AppDatabase extends _$AppDatabase {
           category: Value(_nullable(row['category'])),
           barcode: Value(_nullable(row['barcode'])),
           isActive: Value(row['isActive'] != false),
-          createdAt: Value(_rowDate(row['createdAt']) ?? now),
-          updatedAt: Value(now),
+          createdAt: Value(_rowDate(row['createdAt']) ?? createdNow),
+          updatedAt: Value(createdNow),
           syncStatus: const Value('pending'),
         ));
+        importedItemIds.add(id);
+        imported++;
       }
       for (final row in customerRows) {
-        final now = _rowDate(row['updatedAt']) ?? DateTime.now();
-        await into(customers).insertOnConflictUpdate(CustomersCompanion(
-          id: Value(row['id'].toString()),
+        final id = row['id'].toString();
+        if (existingCustomerIds.contains(id)) continue;
+        final createdNow = _rowDate(row['updatedAt']) ?? now;
+        await into(customers).insert(CustomersCompanion(
+          id: Value(id),
           name: Value(row['name'].toString()),
           phone: Value(_nullable(row['phone'])),
           email: Value(_nullable(row['email'])),
           address: Value(_nullable(row['address'])),
           notes: Value(_nullable(row['notes'])),
-          createdAt: Value(_rowDate(row['createdAt']) ?? now),
-          updatedAt: Value(now),
+          createdAt: Value(_rowDate(row['createdAt']) ?? createdNow),
+          updatedAt: Value(createdNow),
           syncStatus: const Value('pending'),
         ));
+        importedCustomerIds.add(id);
+        imported++;
       }
       for (final row in invoiceRows) {
-        final now = _rowDate(row['updatedAt']) ?? DateTime.now();
-        await into(invoices).insertOnConflictUpdate(InvoicesCompanion(
-          id: Value(row['id'].toString()),
+        final id = row['id'].toString();
+        if (existingInvoiceIds.contains(id)) continue;
+        final createdNow = _rowDate(row['updatedAt']) ?? now;
+        await into(invoices).insert(InvoicesCompanion(
+          id: Value(id),
           invoiceNumber: Value(row['invoiceNumber'].toString()),
           customerId: Value(_nullable(row['customerId'])),
           subtotalMinor: Value(_number(row['subtotalMinor'])),
@@ -549,15 +570,20 @@ class AppDatabase extends _$AppDatabase {
           paymentMethod: Value(row['paymentMethod'].toString()),
           status: Value(row['status']?.toString() ?? 'completed'),
           notes: Value(_nullable(row['notes'])),
-          createdAt: Value(_rowDate(row['createdAt']) ?? now),
-          updatedAt: Value(now),
+          createdAt: Value(_rowDate(row['createdAt']) ?? createdNow),
+          updatedAt: Value(createdNow),
           syncStatus: const Value('pending'),
         ));
+        importedInvoiceIds.add(id);
+        imported++;
       }
       for (final row in invoiceItemRows) {
-        await into(invoiceItems).insertOnConflictUpdate(InvoiceItemsCompanion(
-          id: Value(row['id'].toString()),
-          invoiceId: Value(row['invoiceId'].toString()),
+        final id = row['id'].toString();
+        final invoiceId = row['invoiceId'].toString();
+        if (existingInvoiceItemIds.contains(id) || !importedInvoiceIds.contains(invoiceId)) continue;
+        await into(invoiceItems).insert(InvoiceItemsCompanion(
+          id: Value(id),
+          invoiceId: Value(invoiceId),
           itemId: Value(row['itemId'].toString()),
           itemNameSnapshot: Value(row['itemNameSnapshot'].toString()),
           skuSnapshot: Value(_nullable(row['skuSnapshot'])),
@@ -567,6 +593,7 @@ class AppDatabase extends _$AppDatabase {
           taxMinor: Value(_number(row['taxMinor'])),
           lineTotalMinor: Value(_number(row['lineTotalMinor'])),
         ));
+        imported++;
       }
       for (final row in itemRows) {
         await into(syncQueue).insert(SyncQueueCompanion.insert(
@@ -584,7 +611,7 @@ class AppDatabase extends _$AppDatabase {
         ));
       }
     });
-    return itemRows.length + customerRows.length + invoiceRows.length + invoiceItemRows.length;
+    return imported;
   }
 
   static String _rowValue(Map<String, String> row, List<String> keys) {
