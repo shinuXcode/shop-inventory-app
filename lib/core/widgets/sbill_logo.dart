@@ -12,10 +12,7 @@ class SBillLogo extends StatelessWidget {
       width: size,
       height: size,
       child: CustomPaint(
-        painter: _SBillLogoPainter(
-          light: Theme.of(context).colorScheme.primary,
-          dark: Theme.of(context).brightness == Brightness.dark,
-        ),
+        painter: const _SBillLogoPainter(),
       ),
     );
 
@@ -38,10 +35,7 @@ class SBillLogo extends StatelessWidget {
 }
 
 class _SBillLogoPainter extends CustomPainter {
-  const _SBillLogoPainter({required this.light, required this.dark});
-
-  final Color light;
-  final bool dark;
+  const _SBillLogoPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -75,21 +69,8 @@ class _SBillLogoPainter extends CustomPainter {
         ..strokeJoin = StrokeJoin.round,
     );
 
-    if (!dark) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(30 * scale, 30 * scale, 964 * scale, 964 * scale),
-          Radius.circular(224 * scale),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2 * scale
-          ..color = light.withValues(alpha: .10),
-      );
-    }
   }
 
   @override
-  bool shouldRepaint(covariant _SBillLogoPainter oldDelegate) =>
-      oldDelegate.light != light || oldDelegate.dark != dark;
+  bool shouldRepaint(covariant _SBillLogoPainter oldDelegate) => false;
 }
