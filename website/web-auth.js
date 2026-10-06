@@ -99,3 +99,13 @@ export function friendlyError(error, fallback = 'Something went wrong. Please tr
   if (message.includes('row-level security') || message.includes('permission')) return 'This account is not allowed to change that information.';
   return fallback;
 }
+
+
+export async function closeTicket(ticketId) {
+  const supabase = await getSupabase();
+  if (!supabase) throw new Error('Support service is unavailable.');
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error('Sign in required.');
+  const { error } = await supabase.rpc('close_support_ticket', { p_ticket_id: ticketId });
+  if (error) throw error;
+}
