@@ -23,7 +23,7 @@ void main() {
       expect(preview.rows.single['stock'], '3');
     });
 
-    test('imports products and deduplicates by SKU', () async {
+    test('imports products and skips duplicate SKU without overwriting', () async {
       final db = AppDatabase.forTesting();
       addTearDown(db.close);
 
@@ -47,12 +47,12 @@ void main() {
       ]);
 
       expect(first, 1);
-      expect(second, 1);
+      expect(second, 0);
       final rows = await db.searchItems('CB-01');
       expect(rows, hasLength(1));
-      expect(rows.single.name, 'Cable Updated');
-      expect(rows.single.priceMinor, 10900);
-      expect(rows.single.stockQuantity, 12);
+      expect(rows.single.name, 'Cable');
+      expect(rows.single.priceMinor, 9900);
+      expect(rows.single.stockQuantity, 10);
     });
 
     test('customer stats include purchases and credit invoices', () async {
@@ -92,6 +92,34 @@ void main() {
       expect(stats.invoiceCount, 2);
       expect(stats.totalMinor, 15000);
       expect(stats.creditMinor, 5000);
+    });
+
+    test('backup restore skips existing records', () async {
+      final source = AppDatabase.forTesting();
+      final target = AppDatabase.forTesting();
+      addTearDown(source.close);
+      addTearDown(target.close);
+
+      final now = DateTime.now();
+      await source.saveCustomer(CustomersCompanion.insert(
+        id: 'customer-1',
+        name: 'Source Customer',
+        createdAt: now,
+        updatedAt: now,
+      ));
+      final snapshot = await source.exportSnapshot();
+      await target.saveCustomer(CustomersCompanion.insert(
+        id: 'customer-1',
+        name: 'Existing Customer',
+        createdAt: now,
+        updatedAt: now,
+      ));
+
+      final imported = await target.importSnapshot(snapshot);
+
+      expect(imported, 0);
+      final customer = await target.customerById('customer-1');
+      expect(customer?.name, 'Existing Customer');
     });
 
     test('backup snapshot is portable JSON data', () async {
