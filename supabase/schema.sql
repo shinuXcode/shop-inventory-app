@@ -244,6 +244,22 @@ create index if not exists support_tickets_user_updated_idx
   on public.support_tickets(user_id, updated_at desc);
 
 alter table public.support_tickets enable row level security;
+-- Explicit API privileges; RLS remains the authorization boundary.
+grant select on public.businesses to authenticated;
+grant update on public.businesses to authenticated;
+grant select on public.business_members to authenticated;
+grant select, insert, update on public.items to authenticated;
+grant select, insert, update on public.customers to authenticated;
+grant select, insert, update on public.invoices to authenticated;
+grant select, insert, update on public.invoice_items to authenticated;
+grant select, insert on public.sync_events to authenticated;
+grant select, insert on public.support_tickets to authenticated;
+
+revoke all on function public.is_business_member(uuid) from public;
+grant execute on function public.is_business_member(uuid) to authenticated;
+revoke all on function public.is_business_manager(uuid) from public;
+grant execute on function public.is_business_manager(uuid) to authenticated;
+
 
 drop policy if exists "users can read own support tickets" on public.support_tickets;
 create policy "users can read own support tickets"
