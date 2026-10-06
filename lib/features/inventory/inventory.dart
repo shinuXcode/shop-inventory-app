@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../app.dart';
 import '../../core/database/app_database.dart';
+import '../../core/widgets/user_facing_error.dart';
 import '../migration/migration.dart';
 
 final itemsProvider = StreamProvider.autoDispose<List<Item>>(
@@ -52,7 +53,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       body: items.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
-          child: Text('Could not load inventory: $error'),
+          child: Text(userFacingError(error, fallback: 'Inventory is temporarily unavailable. Please try again.')),
         ),
         data: (list) {
           final query = search.text.trim().toLowerCase();
