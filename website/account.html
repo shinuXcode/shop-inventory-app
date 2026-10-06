@@ -42,16 +42,22 @@ async function refresh(){
   if(user){
     form.classList.add('hidden'); card.classList.remove('hidden');
     document.getElementById('accountEmail').textContent=user.email||'SBILL account';
-    const workspace=await getWorkspace();
-    document.getElementById('workspaceName').textContent=workspace?('Workspace: '+workspace.name):'No workspace linked yet';
-    document.getElementById('workspaceCreator').classList.toggle('hidden', !!workspace);
-    note('Signed in.');
+    try {
+      const workspace=await getWorkspace();
+      document.getElementById('workspaceName').textContent=workspace?('Workspace: '+workspace.name):'No workspace linked yet';
+      document.getElementById('workspaceCreator').classList.toggle('hidden', !!workspace);
+      note('Signed in.');
+    } catch (err) {
+      document.getElementById('workspaceName').textContent='Workspace status unavailable';
+      document.getElementById('workspaceCreator').classList.add('hidden');
+      note(friendlyError(err,'Your account is signed in, but workspace details are temporarily unavailable.'));
+    }
   }else{
     form.classList.remove('hidden');card.classList.add('hidden');note('Sign in to use the same account as the SBILL app.');
   }
 }
 form.addEventListener('submit',async e=>{
-  e.preventDefault(); const supabase=await getSupabase(); if(!supabase){note('Cloud account is not configured.');return;}
+  e.preventDefault(); const supabase=await getSupabase(); if(!supabase){note('Account service is temporarily unavailable. SBILL can still be used offline.');return;}
   try{await supabase.auth.signInWithPassword({email:email.value.trim(),password:password.value});note('Signed in.');await refresh();}catch(err){note(friendlyError(err, 'Account action could not be completed. Please try again.'));}
 });
 document.getElementById('signup').onclick=async()=>{
