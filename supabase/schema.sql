@@ -230,7 +230,7 @@ create table if not exists public.support_tickets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   business_id uuid references public.businesses(id) on delete set null,
-  category text not null default 'General',
+  category text not null default 'General' check (category in ('General','Bug','Billing','Sync','Feature')),
   subject text not null,
   message text not null,
   status text not null default 'open' check (status in ('open','in_progress','closed')),
@@ -248,13 +248,19 @@ alter table public.support_tickets enable row level security;
 drop policy if exists "users can read own support tickets" on public.support_tickets;
 create policy "users can read own support tickets"
   on public.support_tickets for select
+  to authenticated
   using (user_id = auth.uid());
 
 drop policy if exists "users can create own support tickets" on public.support_tickets;
 create policy "users can create own support tickets"
   on public.support_tickets for insert
+  to authenticated
   with check (
     user_id = auth.uid()
+    and status = 'open'
+    and admin_reply is null
+    and category in ('General','Bug','Billing','Sync','Feature')
+    and priority in ('low','normal','high')
     and (business_id is null or public.is_business_member(business_id))
   );
 
@@ -270,9 +276,12 @@ begin
   if auth.uid() is null then
     raise exception 'Authentication required';
   end if;
+
   update public.support_tickets
   set status = 'closed', updated_at = now()
-  where id = p_ticket_id and user_id = auth.uid();
+  where id = p_ticket_id
+    and user_id = auth.uid()
+    and status <> 'closed';
 end;
 $;
 
