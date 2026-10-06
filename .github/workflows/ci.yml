@@ -118,7 +118,7 @@ jobs:
           image = image.resize((N, N), Image.Resampling.LANCZOS)
           image.save("assets/icon/sbill_icon.png", "PNG", optimize=True)
           PY
-      - run: dart run flutter_launcher_icons
+      # Platform jobs own launcher generation; quality must not depend on platform icon assets.
       - name: Check cloud build configuration
         shell: bash
         run: |
