@@ -35,14 +35,14 @@ class ImportPreview {
 
 class DataTransferService {
   static Future<ImportPreview?> pick() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'json', 'txt'],
       allowMultiple: false,
     );
     if (result == null || result.files.isEmpty) return null;
     final picked = result.files.first;
-    final bytes = picked.bytes ?? await File(picked.path!).readAsBytes();
+    final bytes = await picked.readAsBytes();
     return parseFile(picked.name, bytes);
   }
 
