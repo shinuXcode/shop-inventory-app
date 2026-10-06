@@ -119,35 +119,56 @@ jobs:
           image.save("assets/icon/sbill_icon.png", "PNG", optimize=True)
           PY
       # Platform jobs own launcher generation; quality must not depend on platform icon assets.
-      - name: Check cloud build configuration
-        shell: bash
-        run: |
-          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_PUBLISHABLE_KEY" ]; then
-            echo "Supabase account/sync configuration: enabled"
-          else
-            echo "Supabase account/sync configuration: disabled for this build (repository variables are not set)."
-          fi
-      - run: flutter build apk --debug --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
-      - run: flutter build apk --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
-      - name: Verify Android APK
-        shell: bash
-        run: |
-          APK="build/app/outputs/flutter-apk/app-release.apk"
-          APKSIGNER="$(find "${ANDROID_HOME}/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
-          ZIPALIGN="$(find "${ANDROID_HOME}/build-tools" -name zipalign -type f | sort -V | tail -n 1)"
-          test -s "$APK"
-          test -n "$APKSIGNER"
-          test -n "$ZIPALIGN"
-          "$APKSIGNER" verify --verbose --print-certs "$APK"
-          "$ZIPALIGN" -c -v 4 "$APK"
-          "$ZIPALIGN" -c -P 16 -v 4 "$APK"
-          unzip -t "$APK"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sbill-android-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
       - run: test -s website/index.html
       - run: test -s website/styles.css
+
+
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: dart run build_runner build
+      - run: flutter create --platforms=android .
+      - run: flutter build apk --debug --dart-define=SUPABASE_URL="${{ env.SUPABASE_URL }}" --dart-define=SUPABASE_PUBLISHABLE_KEY="${{ env.SUPABASE_PUBLISHABLE_KEY }}"
+      - run: flutter build apk --release --dart-define=SUPABASE_URL="${{ env.SUPABASE_URL }}" --dart-define=SUPABASE_PUBLISHABLE_KEY="${{ env.SUPABASE_PUBLISHABLE_KEY }}"
+      - name: Validate Android artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEBUG_APK="build/app/outputs/flutter-apk/app-debug.apk"
+          RELEASE_APK="build/app/outputs/flutter-apk/app-release.apk"
+          APKSIGNER="$(find "${ANDROID_HOME}/build-tools" -name apksigner -type f | sort -V | tail -n 1)"
+          ZIPALIGN="$(find "${ANDROID_HOME}/build-tools" -name zipalign -type f | sort -V | tail -n 1)"
+          test -s "$DEBUG_APK"
+          test -s "$RELEASE_APK"
+          test -n "$APKSIGNER"
+          test -n "$ZIPALIGN"
+          "$APKSIGNER" verify --verbose --print-certs "$DEBUG_APK"
+          "$APKSIGNER" verify --verbose --print-certs "$RELEASE_APK"
+          "$ZIPALIGN" -c -v 4 "$DEBUG_APK"
+          "$ZIPALIGN" -c -v 4 "$RELEASE_APK"
+          if "$ZIPALIGN" -h 2>&1 | grep -q -- '-P'; then
+            "$ZIPALIGN" -c -P 16 -v 4 "$DEBUG_APK"
+            "$ZIPALIGN" -c -P 16 -v 4 "$RELEASE_APK"
+          else
+            echo "zipalign does not expose -P 16 on this runner; 16 KB profile check is unavailable."
+          fi
+          unzip -t "$DEBUG_APK"
+          unzip -t "$RELEASE_APK"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbill-android-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbill-android-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
 
   windows:
     runs-on: windows-latest
@@ -543,17 +564,19 @@ jobs:
 
   release-gate:
     if: always()
-    needs: [quality, windows, macos, ios]
+    needs: [quality, android, windows, macos, ios]
     runs-on: ubuntu-latest
     steps:
       - name: Validate release jobs
         shell: bash
         run: |
           echo "quality=${{ needs.quality.result }}"
+          echo "android=${{ needs.android.result }}"
           echo "windows=${{ needs.windows.result }}"
           echo "macos=${{ needs.macos.result }}"
           echo "ios=${{ needs.ios.result }}"
           test "${{ needs.quality.result }}" = "success"
+          test "${{ needs.android.result }}" = "success"
           test "${{ needs.windows.result }}" = "success"
           test "${{ needs.macos.result }}" = "success"
           test "${{ needs.ios.result }}" = "success"
