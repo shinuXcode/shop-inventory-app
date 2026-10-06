@@ -68,13 +68,34 @@ export async function createTicket(payload) {
   if (!supabase) throw new Error('SBILL cloud account is not configured.');
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error('Sign in required.');
-  const { error } = await supabase
-    .from('support_tickets')
-    .insert({ ...payload, user_id: userData.user.id });
+  const allowed = {
+    category: payload.category,
+    subject: payload.subject,
+    message: payload.message,
+    priority: payload.priority || 'normal',
+    business_id: payload.business_id ?? null,
+  };
+  const { error } = await supabase.from('support_tickets').insert({
+    ...allowed,
+    user_id: userData.user.id,
+    status: 'open',
+  });
   if (error) throw error;
 }
 
 export async function signOut() {
   const supabase = await getSupabase();
   await supabase?.auth.signOut();
+}
+
+
+export function friendlyError(error, fallback = 'Something went wrong. Please try again.') {
+  const message = String(error?.message || error || '').toLowerCase();
+  if (message.includes('invalid login credentials')) return 'Email or password is incorrect.';
+  if (message.includes('email not confirmed')) return 'Please confirm your email before signing in.';
+  if (message.includes('already registered') || message.includes('already been registered')) return 'An account with this email already exists. Try signing in.';
+  if (message.includes('rate limit') || message.includes('too many requests')) return 'Too many attempts. Please wait a moment and try again.';
+  if (message.includes('network') || message.includes('fetch')) return 'The online service is unavailable right now. Check your connection and try again.';
+  if (message.includes('row-level security') || message.includes('permission')) return 'This account is not allowed to change that information.';
+  return fallback;
 }
