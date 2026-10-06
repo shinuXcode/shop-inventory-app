@@ -340,10 +340,10 @@ class _AccountPageState extends ConsumerState<AccountPage> {
                   children: [
                     Icon(Icons.cloud_off_outlined, size: 56, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(height: 16),
-                    Text('Cloud account is not configured', style: Theme.of(context).textTheme.headlineSmall),
+                    Text('Online account features are unavailable on this build', style: Theme.of(context).textTheme.headlineSmall),
                     const SizedBox(height: 10),
                     const Text(
-                      'SBILL stays fully offline without an account. Build with SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY to enable login, signup and multi-device sync.',
+                      'You can keep using SBILL fully offline. Online sign-in, workspace sync and shared support are unavailable until the online account service is available.',
                       textAlign: TextAlign.center,
                     ),
                   ],
