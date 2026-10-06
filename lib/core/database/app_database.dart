@@ -612,6 +612,16 @@ class AppDatabase extends _$AppDatabase {
     return text == null ? null : DateTime.tryParse(text);
   }
 
+  Future<void> clearLocalData() async {
+    await transaction(() async {
+      await delete(invoiceItems).go();
+      await delete(invoices).go();
+      await delete(customers).go();
+      await delete(items).go();
+      await delete(syncQueue).go();
+    });
+  }
+
   Future<List<Invoice>> recentInvoices({int limit = 30}) => (select(invoices)
     ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
     ..limit(limit))
