@@ -32,4 +32,4 @@ The product website is under website.
 
 SBILL now includes the production-critical offline POS flow: deterministic billing, editable carts, customer selection/history, payment methods, responsive inventory, invoice detail with A4/thermal PDF actions, persistent settings, optional Supabase authentication/workspace sync, dashboard analytics, responsive showcase site and cross-platform CI build jobs.
 
-Final release gating still requires successful CI verification of the generated Android, Windows and macOS release artifacts plus multi-device conflict/pull validation. See `docs/ARCHITECTURE.md` and `docs/RELEASE_CHECKLIST.md`.
+The current sync implementation is foreground/timer based; OS-killed background sync is not claimed. Final release gating still requires successful CI verification of the generated Android, Windows and macOS release artifacts plus multi-device conflict/pull validation. See `docs/ARCHITECTURE.md` and `docs/RELEASE_CHECKLIST.md`.
