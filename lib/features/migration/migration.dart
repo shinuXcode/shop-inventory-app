@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app.dart';
 import '../../core/data/data_transfer_service.dart';
+import '../../core/widgets/user_facing_error.dart';
 
 class MigrationPage extends ConsumerStatefulWidget {
   const MigrationPage({super.key});
@@ -32,7 +33,7 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
         _message('Could not determine the file type. Use a header row with product or customer fields.');
       }
     } catch (e) {
-      _message('Import file could not be opened: ' + e.toString());
+      _message(userFacingError(e, fallback: 'That import file could not be opened. Please choose another file.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -112,7 +113,7 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
       _message('Imported ' + count.toString() + ' records into SBILL.');
       setState(() => preview = null);
     } catch (e) {
-      _message('Import failed: ' + e.toString());
+      _message(userFacingError(e, fallback: 'Import could not be completed. Review the preview and try again.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -130,7 +131,7 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
       final label = exportType == 'backup' ? 'backup' : exportType;
       await DataTransferService.shareFile(file, text: 'SBILL ' + label + ' export');
     } catch (e) {
-      _message('Export failed: ' + e.toString());
+      _message(userFacingError(e, fallback: 'Export could not be completed. Please try again.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
