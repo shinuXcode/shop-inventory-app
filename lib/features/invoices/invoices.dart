@@ -160,43 +160,64 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
   }
 
   Future<void> _print(Invoice invoice, List<InvoiceItem> items, AppSettings settings, {bool thermal = false}) async {
-    await pdf.printInvoice(
-      invoice: invoice,
-      items: items,
-      shopName: settings.businessName,
-      shopAddress: settings.businessAddress,
-      phone: settings.businessPhone,
-      gstNumber: settings.gstNumber,
-      footerText: settings.invoiceFooter,
-      thermal: thermal,
-    );
+    try {
+      await pdf.printInvoice(
+        invoice: invoice,
+        items: items,
+        shopName: settings.businessName,
+        shopAddress: settings.businessAddress,
+        phone: settings.businessPhone,
+        gstNumber: settings.gstNumber,
+        footerText: settings.invoiceFooter,
+        thermal: thermal,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingError(e, fallback: 'The invoice could not be printed. Please try again.'))),
+      );
+    }
   }
 
   Future<void> _share(Invoice invoice, List<InvoiceItem> items, AppSettings settings) async {
-    await pdf.shareInvoice(
-      invoice: invoice,
-      items: items,
-      shopName: settings.businessName,
-      shopAddress: settings.businessAddress,
-      phone: settings.businessPhone,
-      gstNumber: settings.gstNumber,
-      footerText: settings.invoiceFooter,
-    );
+    try {
+      await pdf.shareInvoice(
+        invoice: invoice,
+        items: items,
+        shopName: settings.businessName,
+        shopAddress: settings.businessAddress,
+        phone: settings.businessPhone,
+        gstNumber: settings.gstNumber,
+        footerText: settings.invoiceFooter,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingError(e, fallback: 'The invoice could not be shared. Please try again.'))),
+      );
+    }
   }
 
   Future<void> _save(Invoice invoice, List<InvoiceItem> items, AppSettings settings) async {
-    final file = await pdf.saveInvoice(
-      invoice: invoice,
-      items: items,
-      shopName: settings.businessName,
-      shopAddress: settings.businessAddress,
-      phone: settings.businessPhone,
-      gstNumber: settings.gstNumber,
-      footerText: settings.invoiceFooter,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Saved: ' + file.path)),
-    );
+    try {
+      final file = await pdf.saveInvoice(
+        invoice: invoice,
+        items: items,
+        shopName: settings.businessName,
+        shopAddress: settings.businessAddress,
+        phone: settings.businessPhone,
+        gstNumber: settings.gstNumber,
+        footerText: settings.invoiceFooter,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Invoice saved to ' + file.path)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingError(e, fallback: 'The invoice could not be saved. Please try again.'))),
+      );
+    }
   }
 }
