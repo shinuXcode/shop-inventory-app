@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../app.dart';
 import '../../core/database/app_database.dart';
+import '../../core/widgets/user_facing_error.dart';
 
 class CustomersPage extends ConsumerStatefulWidget {
   const CustomersPage({super.key});
@@ -63,7 +64,7 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
               if (s.connectionState != ConnectionState.done) {
                 return const Center(child: CircularProgressIndicator());
               }
-              if (s.hasError) return Center(child: Text('Failed to load customers: ' + s.error.toString()));
+              if (s.hasError) return Center(child: Text(userFacingError(s.error, fallback: 'Customer records are temporarily unavailable. Please try again.')));
               final list = s.data ?? const <Customer>[];
               if (list.isEmpty) return const Center(child: Text('No customers found.'));
               return ListView.separated(
