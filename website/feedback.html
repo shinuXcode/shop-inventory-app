@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="SBILL feedback and product feedback center.">
+<meta name="theme-color" content="#2563eb">
+<title>Feedback — SBILL</title>
+<link rel="icon" type="image/svg+xml" href="sbill_icon.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="nav">
+  <a class="brand" href="index.html" aria-label="SBILL home">
+    <span class="logo-mark" aria-hidden="true"><img src="sbill_icon.svg" alt=""></span><span>SBILL</span>
+  </a>
+  <nav aria-label="Primary">
+    <a href="index.html#features">Features</a>
+    <a href="index.html#download">Downloads</a>
+    <a href="account.html">Account</a>
+    <a href="support.html">Support</a>
+    <a href="founder.html">Founder</a>
+  </nav>
+</header>
+
+<main class="section portal-page">
+  <div class="portal-card feedback-page">
+    <p class="eyebrow">FEEDBACK & RATINGS</p>
+    <h1 class="portal-title">Tell us what should get better.</h1>
+    <p class="large">Rate SBILL, describe the experience, or report a feature that needs fixing. Your message opens in your email app so nothing is stored on this public website.</p>
+
+    <form id="feedbackForm" class="portal-form">
+      <fieldset class="rating-picker">
+        <legend>Overall rating</legend>
+        <div class="rating-buttons" role="radiogroup" aria-label="Overall rating">
+          <button type="button" data-rating="1" aria-pressed="false">1</button>
+          <button type="button" data-rating="2" aria-pressed="false">2</button>
+          <button type="button" data-rating="3" aria-pressed="false">3</button>
+          <button type="button" data-rating="4" aria-pressed="false">4</button>
+          <button type="button" data-rating="5" aria-pressed="false">5</button>
+        </div>
+      </fieldset>
+
+      <label>Feedback type
+        <select id="type">
+          <option value="General feedback">General feedback</option>
+          <option value="Bug report">Bug report</option>
+          <option value="Feature request">Feature request</option>
+          <option value="UI/UX">UI / UX</option>
+          <option value="Billing">Billing</option>
+          <option value="Sync">Account / sync</option>
+        </select>
+      </label>
+
+      <label>Message
+        <textarea id="message" rows="7" minlength="5" required placeholder="Tell us what worked, what broke, or what should change."></textarea>
+      </label>
+
+      <label>Contact email (optional)
+        <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+      </label>
+
+      <div id="notice" class="portal-state">Choose a rating and write your feedback.</div>
+      <div class="actions">
+        <button class="primary" type="submit">Send feedback</button>
+        <a class="secondary" href="support.html">Open Support Center</a>
+      </div>
+    </form>
+
+    <div class="feedback-links">
+      <a class="portal-tile" href="https://github.com/shinuXcode/shop-inventory-app/issues/new"><b>GitHub issue</b><span>Best for reproducible bugs and engineering details.</span></a>
+      <a class="portal-tile" href="mailto:mrsadabflight@gmail.com?subject=SBILL%20Feedback"><b>Email SBILL</b><span>Best for private product feedback.</span></a>
+    </div>
+  </div>
+</main>
+
+<footer><b>SBILL</b> · Feedback · <a href="founder.html">Founder</a></footer>
+
+<script>
+const ratingButtons=[...document.querySelectorAll('[data-rating]')];
+const notice=document.getElementById('notice');
+let rating=0;
+
+ratingButtons.forEach(button=>{
+  button.addEventListener('click',()=>{
+    rating=Number(button.dataset.rating);
+    ratingButtons.forEach(item=>item.setAttribute('aria-pressed',String(Number(item.dataset.rating)===rating)));
+    notice.textContent='Rating selected: '+rating+'/5.';
+  });
+});
+
+document.getElementById('feedbackForm').addEventListener('submit',event=>{
+  event.preventDefault();
+  const message=document.getElementById('message').value.trim();
+  if(rating===0){notice.textContent='Choose a rating before sending your feedback.';return;}
+  if(message.length<5){notice.textContent='Please write a little more detail.';return;}
+  const type=document.getElementById('type').value;
+  const email=document.getElementById('email').value.trim();
+  const subject=encodeURIComponent('SBILL '+type+' — '+rating+'/5');
+  const body=encodeURIComponent('SBILL feedback\n\nRating: '+rating+'/5\nType: '+type+'\nContact: '+(email||'Not provided')+'\n\n'+message);
+  window.location.href='mailto:mrsadabflight@gmail.com?subject='+subject+'&body='+body;
+  notice.textContent='Opening your email app…';
+});
+</script>
+</body>
+</html>
