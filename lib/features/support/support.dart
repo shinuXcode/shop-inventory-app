@@ -238,6 +238,15 @@ class _SupportPageState extends State<SupportPage> {
     );
   }
 
+  Future<void> _openContact(Uri uri, String unavailableMessage) async {
+    try {
+      final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) _message(unavailableMessage);
+    } catch (_) {
+      if (mounted) _message(unavailableMessage);
+    }
+  }
+
   Widget _contactCard() => Card(
         child: Padding(
           padding: const EdgeInsets.all(18),
@@ -253,25 +262,25 @@ class _SupportPageState extends State<SupportPage> {
                 runSpacing: 10,
                 children: [
                   OutlinedButton.icon(
-                    onPressed: () => launchUrl(
+                    onPressed: () => _openContact(
                       Uri.parse('mailto:mrsadabflight@gmail.com?subject=SBILL%20Support'),
-                      mode: LaunchMode.externalApplication,
+                      'Your email app could not be opened. Please try again.',
                     ),
                     icon: const Icon(Icons.email_outlined),
                     label: const Text('Email support'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => launchUrl(
+                    onPressed: () => _openContact(
                       Uri.parse('https://wa.me/917366815917?text=Hello%20SBILL%20Support'),
-                      mode: LaunchMode.externalApplication,
+                      'WhatsApp could not be opened. Please try again.',
                     ),
                     icon: const Icon(Icons.chat_outlined),
                     label: const Text('WhatsApp'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => launchUrl(
+                    onPressed: () => _openContact(
                       Uri.parse('tel:+917366815917'),
-                      mode: LaunchMode.externalApplication,
+                      'The call action is unavailable on this device.',
                     ),
                     icon: const Icon(Icons.call_outlined),
                     label: const Text('Call support'),
