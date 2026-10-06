@@ -217,9 +217,9 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       );
       setState(() => message = 'Password reset email sent.');
     } on AuthException catch (e) {
-      setState(() => message = e.message);
+      setState(() => message = userFacingError(e, fallback: 'Password reset could not be sent. Please try again.'));
     } catch (e) {
-      setState(() => message = 'Could not send password reset email: $e');
+      setState(() => message = userFacingError(e, fallback: 'Password reset could not be sent. Please try again.'));
     }
   }
 
@@ -314,7 +314,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       settings = AppSettings(prefs);
       setState(() => message = 'Signed out. Local data remains available offline.');
     } catch (e) {
-      setState(() => message = 'Sign out failed: $e');
+      setState(() => message = userFacingError(e, fallback: 'Sign out could not be completed. Please try again.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
