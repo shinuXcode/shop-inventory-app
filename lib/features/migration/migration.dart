@@ -42,7 +42,18 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
     final db = ref.read(databaseProvider);
     var count = 0;
 
-    if (value.kind == 'products') {
+    if (value.kind == 'backup') {
+      final items = await db.activeItemsForExport();
+      final customers = await db.getCustomers();
+      final invoices = await db.recentInvoices(limit: 1000000);
+      final itemIds = items.map((x) => x.id).toSet();
+      final customerIds = customers.map((x) => x.id).toSet();
+      final invoiceIds = invoices.map((x) => x.id).toSet();
+      final snapshot = value.snapshot ?? const <String, dynamic>{};
+      count += ((snapshot['items'] as List?)?.whereType<Map>().where((x) => itemIds.contains(x['id']?.toString())).length ?? 0);
+      count += ((snapshot['customers'] as List?)?.whereType<Map>().where((x) => customerIds.contains(x['id']?.toString())).length ?? 0);
+      count += ((snapshot['invoices'] as List?)?.whereType<Map>().where((x) => invoiceIds.contains(x['id']?.toString())).length ?? 0);
+    } else if (value.kind == 'products') {
       final existing = await db.activeItemsForExport();
       final sku = <String>{};
       final barcode = <String>{};
@@ -224,12 +235,25 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
             ),
             const SizedBox(height: 8),
             Text(value.isValid ? count.toString() + ' records ready to import' : value.error!),
+            if (value.validationErrors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                value.validationErrors.length.toString() + ' validation error(s) detected.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              ...value.validationErrors.take(6).map(
+                (error) => Text('• ' + error, style: Theme.of(context).textTheme.bodySmall),
+              ),
+              if (value.validationErrors.length > 6)
+                Text('… and ' + (value.validationErrors.length - 6).toString() + ' more.', style: Theme.of(context).textTheme.bodySmall),
+            ],
             if (value.isValid && value.kind != 'backup' && value.rows.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 duplicateCount == 0
                     ? 'No matching records found in the current database.'
-                    : duplicateCount.toString() + ' potential duplicate(s) detected. Existing records will be updated using matching fields.',
+                    : duplicateCount.toString() + ' potential duplicate(s) detected. Existing matches will be skipped; no existing data will be overwritten.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 6),
@@ -255,12 +279,20 @@ class _MigrationPageState extends ConsumerState<MigrationPage> {
             ],
             if (value.isValid) ...[
               const SizedBox(height: 14),
-              FilledButton.icon(
-                onPressed: busy || value.kind == 'unknown' ? null : _import,
-                icon: const Icon(Icons.download_done_outlined),
-                label: const Text('Import into SBILL'),
-              ),
-            ],
+              if (value.validationErrors.isEmpty)
+                FilledButton.icon(
+                  onPressed: busy || value.kind == 'unknown' ? null : _import,
+                  icon: const Icon(Icons.download_done_outlined),
+                  label: const Text('Import valid records'),
+                )
+              else
+                OutlinedButton.icon(
+                  onPressed: null,
+                  icon: const Icon(Icons.error_outline),
+                  label: Text('Fix ' + value.validationErrors.length.toString() + ' validation error(s) first'),
+                ),
+
+];
           ],
         ),
       ),
