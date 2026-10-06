@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/widgets/user_facing_error.dart';
 
 import '../account/account.dart';
 import '../../core/cloud/cloud_config.dart';
@@ -47,7 +50,7 @@ class _SupportPageState extends State<SupportPage> {
         if (mounted) setState(() => tickets = List<Map<String, dynamic>>.from(rows));
       }
     } catch (e) {
-      if (mounted) _message('Could not load support tickets: $e');
+      if (mounted) _message(userFacingError(e, fallback: 'Support requests are temporarily unavailable.'));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -87,7 +90,7 @@ class _SupportPageState extends State<SupportPage> {
       _message('Support request submitted.');
       await _loadTickets();
     } catch (e) {
-      _message('Could not submit support request: $e');
+      _message(userFacingError(e, fallback: 'Your support request could not be submitted. Please try again.'));
     } finally {
       if (mounted) setState(() => sending = false);
     }
@@ -99,7 +102,7 @@ class _SupportPageState extends State<SupportPage> {
       await client.rpc('close_support_ticket', params: {'p_ticket_id': id});
       await _loadTickets();
     } catch (e) {
-      _message('Could not close ticket: $e');
+      _message(userFacingError(e, fallback: 'The request could not be closed. Please try again.'));
     }
   }
 
@@ -207,6 +210,8 @@ class _SupportPageState extends State<SupportPage> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                _contactCard(),
+                const SizedBox(height: 16),
                 Text('My requests', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 8),
                 if (loading)
@@ -232,6 +237,51 @@ class _SupportPageState extends State<SupportPage> {
       ),
     );
   }
+
+  Widget _contactCard() => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Direct support', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 6),
+              const Text('Use email, WhatsApp, or the call action. The support phone number is not displayed in the interface.'),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => launchUrl(
+                      Uri.parse('mailto:mrsadabflight@gmail.com?subject=SBILL%20Support'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    icon: const Icon(Icons.email_outlined),
+                    label: const Text('Email support'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => launchUrl(
+                      Uri.parse('https://wa.me/917366815917?text=Hello%20SBILL%20Support'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    icon: const Icon(Icons.chat_outlined),
+                    label: const Text('WhatsApp'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => launchUrl(
+                      Uri.parse('tel:+917366815917'),
+                      mode: LaunchMode.externalApplication,
+                    ),
+                    icon: const Icon(Icons.call_outlined),
+                    label: const Text('Call support'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
 
   Widget _ticket(Map<String, dynamic> ticket) {
     final status = ticket['status']?.toString() ?? 'open';
