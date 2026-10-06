@@ -595,19 +595,19 @@ class AppDatabase extends _$AppDatabase {
         ));
         imported++;
       }
-      for (final row in itemRows) {
+      for (final id in importedItemIds) {
         await into(syncQueue).insert(SyncQueueCompanion.insert(
-          entityType: 'item', entityId: row['id'].toString(), operation: 'upsert', createdAt: DateTime.now(),
+          entityType: 'item', entityId: id, operation: 'upsert', createdAt: DateTime.now(),
         ));
       }
-      for (final row in customerRows) {
+      for (final id in importedCustomerIds) {
         await into(syncQueue).insert(SyncQueueCompanion.insert(
-          entityType: 'customer', entityId: row['id'].toString(), operation: 'upsert', createdAt: DateTime.now(),
+          entityType: 'customer', entityId: id, operation: 'upsert', createdAt: DateTime.now(),
         ));
       }
-      for (final row in invoiceRows) {
+      for (final id in importedInvoiceIds) {
         await into(syncQueue).insert(SyncQueueCompanion.insert(
-          entityType: 'invoice', entityId: row['id'].toString(), operation: 'upsert', createdAt: DateTime.now(),
+          entityType: 'invoice', entityId: id, operation: 'upsert', createdAt: DateTime.now(),
         ));
       }
     });
