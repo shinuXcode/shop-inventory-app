@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../app.dart';
 import '../../core/cloud/cloud_config.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/sync/sync_service.dart';
+import '../../core/widgets/user_facing_error.dart';
 
 class AccountPage extends ConsumerStatefulWidget {
   const AccountPage({super.key});
@@ -49,10 +49,20 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         if (!mounted) return;
         setState(() {});
         if (client.auth.currentUser != null) {
-          await _bindCurrentAccount();
+          try {
+            await _bindCurrentAccount();
+          } catch (e) {
+            if (mounted) setState(() => message = userFacingError(e, fallback: 'Your account is signed in, but the workspace could not be restored.'));
+          }
         }
       });
-      if (user != null) await _bindCurrentAccount();
+      if (user != null) {
+        try {
+          await _bindCurrentAccount();
+        } catch (e) {
+          if (mounted) message = userFacingError(e, fallback: 'Your account is signed in, but the workspace could not be restored.');
+        }
+      }
     }
     if (mounted) setState(() => loading = false);
   }
@@ -184,9 +194,9 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         await _bindCurrentAccount();
       }
     } on AuthException catch (e) {
-      setState(() => message = e.message);
+      setState(() => message = userFacingError(e));
     } catch (e) {
-      setState(() => message = 'Account action failed: $e');
+      setState(() => message = userFacingError(e, fallback: 'The account action could not be completed. Please try again.'));
     } finally {
       password.clear();
       if (mounted) setState(() => busy = false);
@@ -275,7 +285,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
       await ref.read(syncServiceProvider).syncNow();
       setState(() => message = 'Workspace created and synced.');
     } catch (e) {
-      setState(() => message = 'Workspace creation failed: $e');
+      setState(() => message = userFacingError(e, fallback: 'Workspace creation failed. Please try again.'));
     } finally {
       if (mounted) setState(() => busy = false);
     }
