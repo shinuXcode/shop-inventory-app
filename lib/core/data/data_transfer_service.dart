@@ -60,6 +60,7 @@ class DataTransferService {
             kind: 'backup',
             rows: const [],
             snapshot: decoded,
+            validationErrors: _validateBackup(decoded),
           );
         }
         final rows = _rowsFromJson(decoded);
@@ -153,6 +154,9 @@ class DataTransferService {
 
   static Future<int> importPreview(AppDatabase db, ImportPreview preview) async {
     if (!preview.isValid) throw StateError(preview.error ?? 'Invalid import');
+    if (preview.validationErrors.isNotEmpty) {
+      throw StateError('Please fix the validation errors shown in the preview before importing.');
+    }
     if (preview.kind == 'backup' && preview.snapshot != null) {
       return db.importSnapshot(preview.snapshot!);
     }
