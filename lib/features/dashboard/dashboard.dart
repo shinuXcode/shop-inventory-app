@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 
 import '../../app.dart';
 import '../../core/database/app_database.dart';
-import '../migration/migration.dart';
 import '../shell/shell.dart';
 
 final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
@@ -46,7 +45,7 @@ class DashboardPage extends ConsumerWidget {
       body: dashboard.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
-          child: Text('Failed to load dashboard: ' + error.toString()),
+          child: Text('Dashboard data is temporarily unavailable. Please try again.),
         ),
         data: (data) {
           final invoices = data.invoices;
@@ -152,16 +151,6 @@ class DashboardPage extends ConsumerWidget {
                     'Add customer',
                     Icons.person_add_outlined,
                     3,
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const MigrationPage(),
-                      ),
-                    ),
-                    icon: const Icon(Icons.move_to_inbox_outlined),
-                    label: const Text('Switch to SBILL'),
                   ),
                 ],
               ),
