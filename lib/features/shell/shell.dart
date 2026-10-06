@@ -7,6 +7,8 @@ import '../customers/customers.dart';
 import '../invoices/invoices.dart';
 import '../settings/settings.dart';
 import '../onboarding/onboarding.dart';
+import '../migration/migration.dart';
+import '../account/account.dart';
 import '../../core/widgets/sbill_logo.dart';
 
 class Shell extends StatefulWidget {
@@ -38,11 +40,29 @@ class _ShellState extends State<Shell> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final prefs = await SharedPreferences.getInstance();
       if (!mounted || prefs.getBool('onboardingComplete') == true) return;
-      await showDialog<void>(
+      final destination = await showDialog<OnboardingDestination>(
         context: context,
         barrierDismissible: false,
         builder: (_) => const OnboardingDialog(),
       );
+      if (!mounted) return;
+      switch (destination) {
+        case OnboardingDestination.migration:
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const MigrationPage()),
+          );
+          break;
+        case OnboardingDestination.account:
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AccountPage()),
+          );
+          break;
+        case OnboardingDestination.none:
+        case null:
+          break;
+      }
     });
   }
 
