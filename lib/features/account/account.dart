@@ -27,6 +27,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   bool busy = false;
   bool signUp = false;
   String? message;
+  String? lastSyncAt;
 
   bool get configured => CloudConfig.configured;
 
@@ -43,6 +44,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
   Future<void> _load() async {
     prefs = await SharedPreferences.getInstance();
     settings = AppSettings(prefs);
+    lastSyncAt = prefs.getString('lastSyncAt');
     email.text = user?.email ?? '';
     if (configured) {
       authSubscription = client.auth.onAuthStateChange.listen((_) async {
@@ -150,6 +152,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
         thermalReceipt: settings.thermalReceipt,
         darkMode: settings.darkMode,
         invoiceFooter: settings.invoiceFooter,
+        currency: row['currency']?.toString() ?? settings.currency,
         businessId: businessId,
         accountUserId: client.auth.currentUser?.id,
       );
@@ -295,6 +298,7 @@ class _AccountPageState extends ConsumerState<AccountPage> {
     if (settings.businessId == null || busy) return;
     setState(() => busy = true);
     await ref.read(syncServiceProvider).syncNow();
+    lastSyncAt = prefs.getString('lastSyncAt');
     if (mounted) {
       setState(() {
         busy = false;
@@ -534,7 +538,16 @@ class _AccountPageState extends ConsumerState<AccountPage> {
           ],
         ),
       ),
-      const SizedBox(height: 16),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.history_outlined),
+          title: const Text('Last successful sync'),
+          subtitle: Text(lastSyncAt == null
+              ? 'No completed cloud sync on this device yet.'
+              : DateTime.tryParse(lastSyncAt!)?.toLocal().toString() ?? 'Sync timestamp unavailable'),
+        ),
+      ),
+      const SizedBox(height: 12),
       Wrap(
         spacing: 10,
         runSpacing: 10,
