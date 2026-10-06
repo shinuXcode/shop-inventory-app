@@ -229,16 +229,24 @@ class _CustomersPageState extends ConsumerState<CustomersPage> {
     );
     if (ok != true || name.text.trim().isEmpty) return;
     final now = DateTime.now();
-    await ref.read(databaseProvider).saveCustomer(CustomersCompanion.insert(
-      id: customer?.id ?? const Uuid().v4(),
-      name: name.text.trim(),
-      phone: Value(phone.text.trim().isEmpty ? null : phone.text.trim()),
-      email: Value(email.text.trim().isEmpty ? null : email.text.trim()),
-      address: Value(address.text.trim().isEmpty ? null : address.text.trim()),
-      notes: Value(notes.text.trim().isEmpty ? null : notes.text.trim()),
-      createdAt: customer?.createdAt ?? now,
-      updatedAt: now,
-    ));
-    refresh();
+    try {
+      await ref.read(databaseProvider).saveCustomer(CustomersCompanion.insert(
+        id: customer?.id ?? const Uuid().v4(),
+        name: name.text.trim(),
+        phone: Value(phone.text.trim().isEmpty ? null : phone.text.trim()),
+        email: Value(email.text.trim().isEmpty ? null : email.text.trim()),
+        address: Value(address.text.trim().isEmpty ? null : address.text.trim()),
+        notes: Value(notes.text.trim().isEmpty ? null : notes.text.trim()),
+        createdAt: customer?.createdAt ?? now,
+        updatedAt: now,
+      ));
+      refresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(userFacingError(e, fallback: 'Customer could not be saved. Please try again.'))),
+        );
+      }
+    }
   }
 }
