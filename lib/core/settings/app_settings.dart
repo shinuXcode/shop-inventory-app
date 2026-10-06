@@ -29,6 +29,7 @@ class AppSettings {
     required String invoicePrefix,
     required bool thermalReceipt,
     required bool darkMode,
+    String currency = 'INR',
     String invoiceFooter = 'Thank you for your business.',
     String? businessId,
     String? accountUserId,
@@ -39,6 +40,7 @@ class AppSettings {
     await _prefs.setString('businessAddress', businessAddress);
     await _prefs.setString('gstNumber', gstNumber);
     await _prefs.setString('invoicePrefix', invoicePrefix);
+    await _prefs.setString('currency', currency.trim().isEmpty ? 'INR' : currency.trim().toUpperCase());
     await _prefs.setBool('thermalReceipt', thermalReceipt);
     await _prefs.setBool('darkMode', darkMode);
     await _prefs.setString('invoiceFooter', invoiceFooter.trim().isEmpty ? 'Thank you for your business.' : invoiceFooter.trim());
