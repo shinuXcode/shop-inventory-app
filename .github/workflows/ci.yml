@@ -1,5 +1,9 @@
 name: SBILL CI
 # Final production validation workflow for every main commit.
+concurrency:
+  group: sbill-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
