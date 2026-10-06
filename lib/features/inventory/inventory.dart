@@ -35,7 +35,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
         title: const Text('Inventory'),
         actions: [
           IconButton(
-            tooltip: 'Import products / switch to SBILL',
+            tooltip: 'Import products',
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MigrationPage()),
@@ -195,7 +195,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                                               ),
                                               IconButton(
                                                 tooltip:
-                                                    'Deactivate product',
+                                                    'Archive product',
                                                 onPressed: () => _deactivate(
                                                   context,
                                                   item,
@@ -265,7 +265,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                                       ),
                                       PopupMenuItem(
                                         value: 'deactivate',
-                                        child: Text('Deactivate'),
+                                        child: Text('Archive'),
                                       ),
                                     ],
                                     icon:
@@ -421,20 +421,44 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
 
       if (ok != true || name.text.trim().isEmpty) return;
 
-      final priceRupees = double.tryParse(price.text.trim()) ?? 0;
-      final taxRate = double.tryParse(tax.text.trim()) ?? 0;
-      final stockValue = int.tryParse(stock.text.trim()) ?? 0;
-      final threshold = int.tryParse(lowStock.text.trim()) ?? 5;
+      final priceText = price.text.trim();
+      final taxText = tax.text.trim();
+      final stockText = stock.text.trim();
+      final thresholdText = lowStock.text.trim();
+      final priceRupees = double.tryParse(priceText);
+      final taxRate = double.tryParse(taxText);
+      final stockValue = int.tryParse(stockText);
+      final threshold = int.tryParse(thresholdText);
 
-      if (priceRupees < 0 ||
-          taxRate < 0 ||
-          stockValue < 0 ||
-          threshold < 0) {
+      if (priceRupees == null || !priceRupees.isFinite ||
+          taxRate == null || !taxRate.isFinite ||
+          stockValue == null || threshold == null ||
+          priceRupees < 0 || taxRate < 0 || taxRate > 100 ||
+          stockValue < 0 || threshold < 0) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Values cannot be negative.')),
+            const SnackBar(content: Text('Enter valid non-negative values. Tax must be between 0 and 100%.')),
           );
         }
+        return;
+      }
+
+      final normalizedSku = sku.text.trim();
+      final normalizedBarcode = barcode.text.trim();
+      final duplicate = await ref.read(databaseProvider).findItemConflict(
+        sku: normalizedSku,
+        barcode: normalizedBarcode,
+        excludingId: item?.id,
+      );
+      if (duplicate != null) {
+        final reason = normalizedSku.isNotEmpty &&
+                duplicate.sku?.trim().toLowerCase() == normalizedSku.toLowerCase()
+            ? 'SKU'
+            : 'barcode';
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('That $reason is already used by “${duplicate.name}”. Choose a unique value.')),
+        );
         return;
       }
 
@@ -505,7 +529,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Deactivate product?'),
+        title: const Text('Archive product?'),
         content: Text(
           '“${item.name}” will disappear from active inventory but remain '
           'in historical invoices.',
@@ -517,7 +541,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Deactivate'),
+            child: const Text('Archive'),
           ),
         ],
       ),
