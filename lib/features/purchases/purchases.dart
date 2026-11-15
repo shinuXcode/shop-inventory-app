@@ -64,6 +64,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
           IconButton(tooltip: 'Add supplier', onPressed: _addSupplier, icon: const Icon(Icons.person_add_alt_1_outlined)),
           IconButton(tooltip: 'Record purchase', onPressed: _recordPurchase, icon: const Icon(Icons.add_shopping_cart_outlined)),
           IconButton(tooltip: 'Add expense', onPressed: _addExpense, icon: const Icon(Icons.post_add_outlined)),
+          IconButton(tooltip: 'Adjust stock', onPressed: _adjustStock, icon: const Icon(Icons.tune_outlined)),
           IconButton(tooltip: 'Refresh', onPressed: _refresh, icon: const Icon(Icons.refresh_outlined)),
         ],
         bottom: TabBar(
@@ -431,6 +432,74 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
     category.dispose();
     amount.dispose();
     description.dispose();
+  }
+
+  Future<void> _adjustStock() async {
+    final data = await _future;
+    if (data.items.isEmpty) {
+      _message('Add a product before adjusting stock.');
+      return;
+    }
+    String? itemId = data.items.first.id;
+    final delta = TextEditingController(text: '1');
+    final reason = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Adjust stock'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                initialValue: itemId,
+                decoration: const InputDecoration(labelText: 'Product'),
+                items: data.items.map((item) =>
+                  DropdownMenuItem(value: item.id, child: Text(item.name))).toList(),
+                onChanged: (value) => setDialogState(() => itemId = value),
+              ),
+              TextField(
+                controller: delta,
+                keyboardType: const TextInputType.numberWithOptions(signed: true),
+                decoration: const InputDecoration(
+                  labelText: 'Quantity change',
+                  helperText: 'Use a positive number to add stock or a negative number to remove it.',
+                ),
+              ),
+              TextField(
+                controller: reason,
+                decoration: const InputDecoration(labelText: 'Reason'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                if (itemId == null || (int.tryParse(delta.text) ?? 0) == 0 || reason.text.trim().isEmpty) return;
+                Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Save adjustment'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (saved == true && itemId != null) {
+      try {
+        await ref.read(databaseProvider).adjustStock(
+          id: const Uuid().v4(),
+          itemId: itemId!,
+          quantityDelta: int.parse(delta.text),
+          reason: reason.text,
+        );
+        _refresh();
+      } catch (error) {
+        _message('Stock adjustment was not saved: $error');
+      }
+    }
+    delta.dispose();
+    reason.dispose();
   }
 
   Future<void> _showExpiring(_RetailData data) async {
