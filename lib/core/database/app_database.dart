@@ -309,6 +309,263 @@ class AppDatabase extends _$AppDatabase {
       entityType: 'customer', entityId: customer.id.value, operation: 'upsert', createdAt: DateTime.now()));
   }
 
+  Future<void> saveSupplier(SuppliersCompanion supplier) async {
+    await into(suppliers).insertOnConflictUpdate(supplier);
+  }
+
+  Future<List<Supplier>> getSuppliers({String query = ''}) {
+    final q = '%' + query.trim() + '%';
+    final statement = select(suppliers)
+      ..orderBy([(t) => OrderingTerm(expression: t.name)]);
+    if (query.trim().isNotEmpty) {
+      statement.where((t) =>
+          t.name.like(q) | t.phone.like(q) | t.gstin.like(q));
+    }
+    return statement.get();
+  }
+
+  Future<List<Purchase>> recentPurchases({int limit = 100}) =>
+      (select(purchases)
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+            ..limit(limit))
+          .get();
+
+  Future<int> supplierOutstandingMinor(String supplierId) async {
+    final row = await customSelect(
+      'SELECT COALESCE(SUM(total_minor - paid_minor), 0) AS amount '
+      'FROM purchases WHERE supplier_id = ? AND payment_status != ?',
+      variables: [
+        Variable<String>(supplierId),
+        const Variable<String>('cancelled'),
+      ],
+      readsFrom: {purchases},
+    ).getSingle();
+    return row.read<int>('amount');
+  }
+
+  Future<void> recordPurchase({
+    required String purchaseId,
+    required String purchaseNumber,
+    required String supplierId,
+    required List<PurchaseLine> lines,
+    required int discountMinor,
+    required int paidMinor,
+    String? notes,
+  }) async {
+    if (lines.isEmpty) {
+      throw ArgumentError('A purchase needs at least one product.');
+    }
+    if (lines.any((line) =>
+        line.quantity <= 0 ||
+        line.unitCostMinor < 0 ||
+        line.taxRateBps < 0 ||
+        line.taxRateBps > 10000)) {
+      throw ArgumentError('Purchase quantities, costs or tax rates are invalid.');
+    }
+
+    await transaction(() async {
+      final supplier = await (select(suppliers)
+            ..where((t) => t.id.equals(supplierId)))
+          .getSingleOrNull();
+      if (supplier == null) throw StateError('Select a valid supplier.');
+
+      final currentItems = <String, Item>{};
+      for (final line in lines) {
+        final item = await (select(items)
+              ..where((t) => t.id.equals(line.itemId)))
+            .getSingleOrNull();
+        if (item == null) {
+          throw StateError('A purchased product no longer exists.');
+        }
+        currentItems[line.itemId] = item;
+      }
+
+      final totals = const BillingCalculator().calculate(
+        lines: lines
+            .map((line) => BillingLine(
+                  unitPriceMinor: line.unitCostMinor,
+                  quantity: line.quantity,
+                  taxRateBps: line.taxRateBps,
+                ))
+            .toList(),
+        discountMinor: discountMinor,
+      );
+      if (paidMinor < 0 || paidMinor > totals.totalMinor) {
+        throw ArgumentError(
+          'Amount paid must be between zero and the purchase total.',
+        );
+      }
+      final status = paidMinor == totals.totalMinor
+          ? 'paid'
+          : paidMinor == 0
+              ? 'unpaid'
+              : 'partial';
+      final now = DateTime.now();
+      await into(purchases).insert(PurchasesCompanion.insert(
+        id: purchaseId,
+        purchaseNumber: purchaseNumber,
+        supplierId: supplierId,
+        subtotalMinor: totals.subtotalMinor,
+        discountMinor: Value(totals.discountMinor),
+        taxMinor: Value(totals.taxMinor),
+        totalMinor: totals.totalMinor,
+        paidMinor: Value(paidMinor),
+        paymentStatus: Value(status),
+        notes: Value(notes),
+        createdAt: now,
+      ));
+
+      var remainingDiscount = discountMinor;
+      var remainingSubtotal = totals.subtotalMinor;
+      for (var index = 0; index < lines.length; index++) {
+        final line = lines[index];
+        final item = currentItems[line.itemId]!;
+        final base = line.unitCostMinor * line.quantity;
+        final allocatedDiscount = index == lines.length - 1
+            ? remainingDiscount
+            : remainingSubtotal == 0
+                ? 0
+                : (base * remainingDiscount + remainingSubtotal ~/ 2) ~/
+                    remainingSubtotal;
+        remainingDiscount -= allocatedDiscount;
+        remainingSubtotal -= base;
+        final tax = const BillingCalculator().taxFor(
+          base - allocatedDiscount,
+          line.taxRateBps,
+        );
+        await into(purchaseItems).insert(PurchaseItemsCompanion.insert(
+          id: line.id,
+          purchaseId: purchaseId,
+          itemId: item.id,
+          itemNameSnapshot: item.name,
+          quantity: line.quantity,
+          unitCostMinor: line.unitCostMinor,
+          taxRate: line.taxRateBps / 100,
+          taxMinor: tax,
+          lineTotalMinor: base - allocatedDiscount + tax,
+        ));
+        await (update(items)..where((t) => t.id.equals(item.id))).write(
+          ItemsCompanion(
+            stockQuantity: Value(item.stockQuantity + line.quantity),
+            costMinor: Value(line.unitCostMinor),
+            updatedAt: Value(now),
+            syncStatus: const Value('pending'),
+          ),
+        );
+        await into(stockBatches).insert(StockBatchesCompanion.insert(
+          id: const Uuid().v4(),
+          itemId: item.id,
+          purchaseItemId: Value(line.id),
+          quantity: line.quantity,
+          expiryDate: Value(line.expiryDate),
+          createdAt: now,
+        ));
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'item',
+          entityId: item.id,
+          operation: 'upsert',
+          createdAt: now,
+        ));
+      }
+    });
+  }
+
+  Future<void> addExpense({
+    required String id,
+    required String category,
+    required int amountMinor,
+    required DateTime incurredAt,
+    String? description,
+    String paymentMethod = 'cash',
+  }) async {
+    if (category.trim().isEmpty) {
+      throw ArgumentError('Expense category is required.');
+    }
+    if (amountMinor <= 0) {
+      throw ArgumentError('Expense amount must be positive.');
+    }
+    await into(expenses).insert(ExpensesCompanion.insert(
+      id: id,
+      category: category.trim(),
+      description: Value(
+        description?.trim().isEmpty == true ? null : description?.trim(),
+      ),
+      amountMinor: amountMinor,
+      paymentMethod: Value(paymentMethod.trim().toLowerCase()),
+      incurredAt: incurredAt,
+    ));
+  }
+
+  Future<void> adjustStock({
+    required String id,
+    required String itemId,
+    required int quantityDelta,
+    required String reason,
+  }) async {
+    if (quantityDelta == 0) {
+      throw ArgumentError('Stock adjustment cannot be zero.');
+    }
+    if (reason.trim().isEmpty) {
+      throw ArgumentError('A stock adjustment reason is required.');
+    }
+    await transaction(() async {
+      final now = DateTime.now();
+      final changed = await customUpdate(
+        'UPDATE items SET stock_quantity = stock_quantity + ?, updated_at = ?, sync_status = ? '
+        'WHERE id = ? AND stock_quantity + ? >= 0',
+        variables: [
+          Variable<int>(quantityDelta),
+          Variable<DateTime>(now),
+          const Variable<String>('pending'),
+          Variable<String>(itemId),
+          Variable<int>(quantityDelta),
+        ],
+        updates: {items},
+      );
+      if (changed != 1) {
+        throw StateError(
+          'Stock adjustment would make inventory negative or the product is missing.',
+        );
+      }
+      await into(stockAdjustments).insert(StockAdjustmentsCompanion.insert(
+        id: id,
+        itemId: itemId,
+        quantityDelta: quantityDelta,
+        reason: reason.trim(),
+        createdAt: now,
+      ));
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'item',
+        entityId: itemId,
+        operation: 'upsert',
+        createdAt: now,
+      ));
+    });
+  }
+
+  Future<List<StockBatch>> expiringStock({int withinDays = 30}) async {
+    final end = DateTime.now().add(Duration(days: withinDays));
+    final rows = await (select(stockBatches)
+          ..where((t) =>
+              t.quantity.isBiggerThanValue(0) & t.expiryDate.isNotNull()))
+        .get();
+    final result = rows.where((row) {
+      final expiry = row.expiryDate;
+      return expiry != null && !expiry.isAfter(end);
+    }).toList();
+    result.sort((a, b) => a.expiryDate!.compareTo(b.expiryDate!));
+    return result;
+  }
+
+  Future<int> expensesBetween(DateTime start, DateTime end) async {
+    final rows = await (select(expenses)
+          ..where((t) =>
+              t.incurredAt.isBiggerOrEqualValue(start) &
+              t.incurredAt.isSmallerThanValue(end)))
+        .get();
+    return rows.fold<int>(0, (sum, row) => sum + row.amountMinor);
+  }
+
   Future<void> checkout({
     required String invoiceId,
     required String invoiceNumber,
@@ -828,6 +1085,24 @@ class AppDatabase extends _$AppDatabase {
     ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
     ..limit(limit))
     .get();
+}
+
+class PurchaseLine {
+  const PurchaseLine({
+    required this.id,
+    required this.itemId,
+    required this.quantity,
+    required this.unitCostMinor,
+    required this.taxRateBps,
+    this.expiryDate,
+  });
+
+  final String id;
+  final String itemId;
+  final int quantity;
+  final int unitCostMinor;
+  final int taxRateBps;
+  final DateTime? expiryDate;
 }
 
 class CartLine {
