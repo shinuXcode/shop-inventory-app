@@ -60,6 +60,10 @@ create table if not exists public.invoices (
   subtotal_minor bigint not null,
   discount_minor bigint not null default 0,
   tax_minor bigint not null default 0,
+  cgst_minor bigint not null default 0,
+  sgst_minor bigint not null default 0,
+  igst_minor bigint not null default 0,
+  gst_supply_type text not null default 'intraState',
   total_minor bigint not null,
   payment_method text not null,
   status text not null default 'paid',
@@ -80,6 +84,9 @@ create table if not exists public.invoice_items (
   unit_price_minor bigint not null,
   unit_cost_minor bigint not null default 0,
   line_discount_minor bigint not null default 0,
+  cgst_minor bigint not null default 0,
+  sgst_minor bigint not null default 0,
+  igst_minor bigint not null default 0,
   tax_rate numeric(6,3) not null,
   tax_minor bigint not null,
   line_total_minor bigint not null
@@ -96,6 +103,14 @@ create table if not exists public.sync_events (
 
 alter table public.invoice_items add column if not exists unit_cost_minor bigint not null default 0;
 alter table public.invoice_items add column if not exists line_discount_minor bigint not null default 0;
+
+alter table public.invoices add column if not exists cgst_minor bigint not null default 0;
+alter table public.invoices add column if not exists sgst_minor bigint not null default 0;
+alter table public.invoices add column if not exists igst_minor bigint not null default 0;
+alter table public.invoices add column if not exists gst_supply_type text not null default 'intraState';
+alter table public.invoice_items add column if not exists cgst_minor bigint not null default 0;
+alter table public.invoice_items add column if not exists sgst_minor bigint not null default 0;
+alter table public.invoice_items add column if not exists igst_minor bigint not null default 0;
 
 create index if not exists items_business_idx on public.items(business_id);
 create index if not exists items_barcode_idx on public.items(business_id, barcode);
