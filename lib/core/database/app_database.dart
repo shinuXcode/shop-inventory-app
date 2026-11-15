@@ -949,6 +949,7 @@ class AppDatabase extends _$AppDatabase {
         if (name.isEmpty) continue;
         final sku = _rowValue(row, const ['sku', 'code']).trim();
         final barcode = _rowValue(row, const ['barcode', 'bar_code']).trim();
+        final hsnSac = _rowValue(row, const ['hsn_sac', 'hsn', 'sac']).trim();
         final existingItem = (sku.isNotEmpty ? bySku[sku.toLowerCase()] : null) ??
             (barcode.isNotEmpty ? byBarcode[barcode] : null) ??
             byName[name.toLowerCase()];
@@ -959,6 +960,7 @@ class AppDatabase extends _$AppDatabase {
           sku: Value(sku.isEmpty ? null : sku),
           name: Value(name),
           barcode: Value(barcode.isEmpty ? null : barcode),
+          hsnSac: Value(hsnSac.isEmpty ? null : hsnSac),
           category: Value(_rowValue(row, const ['category', 'group']).trim().isEmpty
               ? null : _rowValue(row, const ['category', 'group']).trim()),
           priceMinor: Value(_rowMoneyMinor(row, const ['price', 'price_rupees', 'selling_price', 'rate'])),
@@ -982,6 +984,7 @@ class AppDatabase extends _$AppDatabase {
             lowStockThreshold: companion.lowStockThreshold,
             category: companion.category,
             barcode: companion.barcode,
+            hsnSac: companion.hsnSac,
             createdAt: now,
             updatedAt: now,
           ),
