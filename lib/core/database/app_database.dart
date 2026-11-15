@@ -674,16 +674,22 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<GstSummary> gstSummaryBetween(DateTime start, DateTime end) async {
-    final rows = await (select(invoices)
-          ..where((t) =>
-              t.createdAt.isBiggerOrEqualValue(start) &
-              t.createdAt.isSmallerThanValue(end) &
-              t.status.equals('completed')))
-        .get();
+    final row = await customSelect(
+      'SELECT COALESCE(SUM(cgst_minor), 0) AS cgst, '
+      'COALESCE(SUM(sgst_minor), 0) AS sgst, '
+      'COALESCE(SUM(igst_minor), 0) AS igst '
+      'FROM invoices WHERE created_at >= ? AND created_at < ? AND status != ?',
+      variables: [
+        Variable<DateTime>(start),
+        Variable<DateTime>(end),
+        const Variable<String>('cancelled'),
+      ],
+      readsFrom: {invoices},
+    ).getSingle();
     return GstSummary(
-      cgstMinor: rows.fold<int>(0, (sum, row) => sum + row.cgstMinor),
-      sgstMinor: rows.fold<int>(0, (sum, row) => sum + row.sgstMinor),
-      igstMinor: rows.fold<int>(0, (sum, row) => sum + row.igstMinor),
+      cgstMinor: row.read<int>('cgst'),
+      sgstMinor: row.read<int>('sgst'),
+      igstMinor: row.read<int>('igst'),
     );
   }
 
