@@ -490,7 +490,7 @@ class AppDatabase extends _$AppDatabase {
           taxMinor: tax,
           lineTotalMinor: base - allocatedDiscount + tax,
         ));
-        await into(stockBatches).insert(StockBatchRowCompanion.insert(
+        await into(stockBatches).insert(StockBatchesCompanion.insert(
           id: const Uuid().v4(),
           itemId: item.id,
           purchaseItemId: Value(line.id),
@@ -569,7 +569,7 @@ class AppDatabase extends _$AppDatabase {
       if (remaining == 0) break;
       final consumed = batch.quantity < remaining ? batch.quantity : remaining;
       await (update(stockBatches)..where((t) => t.id.equals(batch.id))).write(
-        StockBatchRowCompanion(quantity: Value(batch.quantity - consumed)),
+        StockBatchesCompanion(quantity: Value(batch.quantity - consumed)),
       );
       remaining -= consumed;
     }
@@ -610,7 +610,7 @@ class AppDatabase extends _$AppDatabase {
       if (quantityDelta < 0) {
         await _consumeStockBatches(itemId, -quantityDelta);
       } else {
-        await into(stockBatches).insert(StockBatchRowCompanion.insert(
+        await into(stockBatches).insert(StockBatchesCompanion.insert(
           id: const Uuid().v4(),
           itemId: itemId,
           quantity: quantityDelta,
@@ -1337,7 +1337,7 @@ class AppDatabase extends _$AppDatabase {
       for (final row in batchRows) {
         final id = row['id'].toString();
         if (existingBatchIds.contains(id)) continue;
-        await into(stockBatches).insert(StockBatchRowCompanion.insert(
+        await into(stockBatches).insert(StockBatchesCompanion.insert(
           id: id,
           itemId: row['itemId'].toString(),
           purchaseItemId: Value(_nullable(row['purchaseItemId'])),
