@@ -242,6 +242,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         currencyCode: settings.currency,
         showLogo: settings.showInvoiceLogo,
         showSku: settings.showSkuOnInvoice,
+        thermal: settings.thermalReceipt,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
