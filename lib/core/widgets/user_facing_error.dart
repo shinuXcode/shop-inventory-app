@@ -4,9 +4,11 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 String userFacingError(
-  Object error, {
+  Object? error, {
   String fallback = 'Something went wrong. Please try again.',
 }) {
+  if (error == null) return fallback;
+
   if (error is UnsupportedError) {
     return error.message?.toString() ?? fallback;
   }
