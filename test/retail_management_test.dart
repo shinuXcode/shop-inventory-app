@@ -78,6 +78,7 @@ void main() {
       name: 'Test Product',
       priceMinor: 10000,
       costMinor: const Value(5000),
+      hsnSac: const Value('8471'),
       stockQuantity: const Value(5),
       createdAt: now,
       updatedAt: now,
@@ -101,6 +102,7 @@ void main() {
 
     final line = await db.invoiceItemsFor('invoice-1');
     expect(line.single.unitCostMinor, 5000);
+    expect(line.single.hsnSacSnapshot, '8471');
     expect(line.single.lineDiscountMinor, 1000);
     expect((await db.select(db.stockBatches).getSingle()).quantity, 3);
     expect(
