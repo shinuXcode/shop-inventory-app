@@ -182,11 +182,12 @@ class DataTransferService {
     final file = File(p.join(dir.path, 'sbill-products.csv'));
     final items = await db.activeItemsForExport();
     final lines = <String>[
-      'name,sku,barcode,category,price,tax,stock,low_stock_threshold',
+      'name,sku,barcode,hsn_sac,category,price,tax,stock,low_stock_threshold',
       ...items.map((x) => _csv([
         x.name,
         x.sku ?? '',
         x.barcode ?? '',
+        x.hsnSac ?? '',
         x.category ?? '',
         (x.priceMinor / 100).toStringAsFixed(2),
         x.taxRate.toString(),
