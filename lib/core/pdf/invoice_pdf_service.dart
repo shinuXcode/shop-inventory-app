@@ -98,7 +98,7 @@ class InvoicePdfService {
     );
     final money = (int value) => _money(value, currencyCode);
     final safeItems = items;
-    final showHsnSac = safeItems.any((item) => (item.hsnSacSnapshot ?? '').trim().isNotEmpty);
+    final showHsnSac = !thermal && safeItems.any((item) => (item.hsnSacSnapshot ?? '').trim().isNotEmpty);
 
     doc.addPage(
       pw.MultiPage(
@@ -177,7 +177,7 @@ class InvoicePdfService {
           pw.TableHelper.fromTextArray(
             headers: [
               'Item',
-              if (showSku) 'SKU',
+              if (showSku && !thermal) 'SKU',
               if (showHsnSac) 'HSN/SAC',
               'Qty',
               'Rate',
@@ -186,7 +186,7 @@ class InvoicePdfService {
             ],
             data: safeItems.map((item) => [
               _safePdfText(item.itemNameSnapshot),
-              if (showSku) _safePdfText(item.skuSnapshot ?? ''),
+              if (showSku && !thermal) _safePdfText(item.skuSnapshot ?? ''),
               if (showHsnSac) _safePdfText(item.hsnSacSnapshot ?? ''),
               item.quantity.toString(),
               money(item.unitPriceMinor),
