@@ -231,62 +231,132 @@ class AppDatabase extends _$AppDatabase {
     required String paymentMethod,
   }) async {
     if (cart.isEmpty) throw ArgumentError('Cart is empty.');
-    if (paymentMethod.trim().isEmpty) throw ArgumentError('Payment method is required.');
+    if (paymentMethod.trim().isEmpty) {
+      throw ArgumentError('Payment method is required.');
+    }
+    if (cart.any((line) => line.quantity <= 0)) {
+      throw ArgumentError('Every cart quantity must be positive.');
+    }
 
-    final calculator = const BillingCalculator();
-    final totals = calculator.calculate(
-      lines: cart.map((line) => BillingLine(
-        unitPriceMinor: line.item.priceMinor,
-        quantity: line.quantity,
-        taxRateBps: (line.item.taxRate * 100).round(),
-      )).toList(),
-      discountMinor: discountMinor,
-    );
+    // Aggregate repeated product lines before checking or decrementing stock.
+    final quantities = <String, int>{};
+    for (final line in cart) {
+      quantities.update(
+        line.item.id,
+        (value) => value + line.quantity,
+        ifAbsent: () => line.quantity,
+      );
+    }
 
     await transaction(() async {
       final now = DateTime.now();
-      for (final line in cart) {
-        if (line.quantity <= 0) throw ArgumentError('Quantity must be positive.');
-        if (line.quantity > line.item.stockQuantity) {
-          throw StateError('Insufficient stock for ' + line.item.name);
+      final currentItems = <String, Item>{};
+      for (final entry in quantities.entries) {
+        final current = await (select(items)
+              ..where((table) => table.id.equals(entry.key)))
+            .getSingleOrNull();
+        if (current == null || !current.isActive) {
+          throw StateError('A product in this cart is no longer available.');
+        }
+        if (entry.value > current.stockQuantity) {
+          throw StateError('Insufficient stock for ${current.name}. Available: ${current.stockQuantity}.');
+        }
+        currentItems[entry.key] = current;
+      }
+
+      final effectiveLines = cart.map((line) {
+        final current = currentItems[line.item.id]!;
+        return BillingLine(
+          unitPriceMinor: current.priceMinor,
+          quantity: line.quantity,
+          taxRateBps: (current.taxRate * 100).round(),
+        );
+      }).toList();
+      final totals = const BillingCalculator().calculate(
+        lines: effectiveLines,
+        discountMinor: discountMinor,
+      );
+
+      await into(invoices).insert(InvoicesCompanion.insert(
+        id: invoiceId,
+        invoiceNumber: invoiceNumber,
+        customerId: Value(customerId),
+        subtotalMinor: totals.subtotalMinor,
+        discountMinor: Value(totals.discountMinor),
+        taxMinor: Value(totals.taxMinor),
+        totalMinor: totals.totalMinor,
+        paymentMethod: paymentMethod.trim().toLowerCase(),
+        createdAt: now,
+        updatedAt: now,
+      ));
+
+      var remainingDiscount = totals.discountMinor;
+      var remainingSubtotal = totals.subtotalMinor;
+      for (var index = 0; index < cart.length; index++) {
+        final line = cart[index];
+        final current = currentItems[line.item.id]!;
+        final lineSubtotal = current.priceMinor * line.quantity;
+        final lineDiscount = index == cart.length - 1
+            ? remainingDiscount
+            : remainingSubtotal == 0
+                ? 0
+                : (lineSubtotal * remainingDiscount + remainingSubtotal ~/ 2) ~/
+                    remainingSubtotal;
+        remainingDiscount -= lineDiscount;
+        remainingSubtotal -= lineSubtotal;
+
+        final lineTax = const BillingCalculator().taxFor(
+          lineSubtotal - lineDiscount,
+          (current.taxRate * 100).round(),
+        );
+        await into(invoiceItems).insert(InvoiceItemsCompanion.insert(
+          id: line.id,
+          invoiceId: invoiceId,
+          itemId: current.id,
+          itemNameSnapshot: current.name,
+          skuSnapshot: Value(current.sku),
+          quantity: line.quantity,
+          unitPriceMinor: current.priceMinor,
+          taxRate: current.taxRate,
+          taxMinor: lineTax,
+          lineTotalMinor: lineSubtotal - lineDiscount + lineTax,
+        ));
+      }
+
+      // Conditional SQL updates prevent stale carts or simultaneous checkouts
+      // from selling stock that is no longer available.
+      for (final entry in quantities.entries) {
+        final changed = await customUpdate(
+          'UPDATE items '
+          'SET stock_quantity = stock_quantity - ?, updated_at = ?, sync_status = ? '
+          'WHERE id = ? AND is_active = 1 AND stock_quantity >= ?',
+          variables: [
+            Variable<int>(entry.value),
+            Variable<DateTime>(now),
+            const Variable<String>('pending'),
+            Variable<String>(entry.key),
+            Variable<int>(entry.value),
+          ],
+          updates: {items},
+        );
+        if (changed != 1) {
+          throw StateError('Stock changed during checkout. Refresh the cart and try again.');
         }
       }
 
-      await into(invoices).insert(InvoicesCompanion.insert(
-        id: invoiceId, invoiceNumber: invoiceNumber, customerId: Value(customerId),
-        subtotalMinor: totals.subtotalMinor, discountMinor: Value(totals.discountMinor),
-        taxMinor: Value(totals.taxMinor), totalMinor: totals.totalMinor,
-        paymentMethod: paymentMethod, createdAt: now, updatedAt: now));
-
-      for (final line in cart) {
-        final lineSubtotal = line.item.priceMinor * line.quantity;
-        final lineDiscount = totals.subtotalMinor == 0 ? 0 :
-            ((lineSubtotal * discountMinor) / totals.subtotalMinor).round();
-        final lineTax = calculator.taxFor(
-          lineSubtotal - lineDiscount,
-          (line.item.taxRate * 100).round(),
-        );
-        await into(invoiceItems).insert(InvoiceItemsCompanion.insert(
-          id: line.id, invoiceId: invoiceId, itemId: line.item.id,
-          itemNameSnapshot: line.item.name, skuSnapshot: Value(line.item.sku),
-          quantity: line.quantity, unitPriceMinor: line.item.priceMinor,
-          taxRate: line.item.taxRate, taxMinor: lineTax,
-          lineTotalMinor: lineSubtotal - lineDiscount + lineTax));
-
-        await (update(items)..where((t) => t.id.equals(line.item.id))).write(
-          ItemsCompanion(
-            stockQuantity: Value(line.item.stockQuantity - line.quantity),
-            updatedAt: Value(now),
-            syncStatus: const Value('pending'),
-          ),
-        );
-      }
-
       await into(syncQueue).insert(SyncQueueCompanion.insert(
-        entityType: 'invoice', entityId: invoiceId, operation: 'upsert', createdAt: now));
-      for (final line in cart) {
+        entityType: 'invoice',
+        entityId: invoiceId,
+        operation: 'upsert',
+        createdAt: now,
+      ));
+      for (final itemId in quantities.keys) {
         await into(syncQueue).insert(SyncQueueCompanion.insert(
-          entityType: 'item', entityId: line.item.id, operation: 'upsert', createdAt: now));
+          entityType: 'item',
+          entityId: itemId,
+          operation: 'upsert',
+          createdAt: now,
+        ));
       }
     });
   }
