@@ -159,6 +159,10 @@ class InvoicePdfService {
                 crossAxisAlignment: pw.CrossAxisAlignment.end,
                 children: [
                   pw.Text('Invoice: ${_safePdfText(invoice.invoiceNumber)}', style: bodyStyle),
+                  pw.Text(
+                    invoice.gstSupplyType == 'interState' ? 'Supply: INTER-STATE' : 'Supply: INTRA-STATE',
+                    style: bodyStyle,
+                  ),
                   pw.Text(_date.format(invoice.createdAt.toLocal()), style: bodyStyle),
                 ],
               ),
@@ -205,7 +209,16 @@ class InvoicePdfService {
                 children: [
                   _summaryRow('Subtotal', money(invoice.subtotalMinor), bodyStyle),
                   _summaryRow('Discount', '-${money(invoice.discountMinor)}', bodyStyle),
-                  _summaryRow('GST / Tax', money(invoice.taxMinor), bodyStyle),
+                  if (invoice.cgstMinor > 0)
+                    _summaryRow('CGST', money(invoice.cgstMinor), bodyStyle),
+                  if (invoice.sgstMinor > 0)
+                    _summaryRow('SGST', money(invoice.sgstMinor), bodyStyle),
+                  if (invoice.igstMinor > 0)
+                    _summaryRow('IGST', money(invoice.igstMinor), bodyStyle),
+                  if (invoice.cgstMinor == 0 &&
+                      invoice.sgstMinor == 0 &&
+                      invoice.igstMinor == 0)
+                    _summaryRow('GST / Tax', money(invoice.taxMinor), bodyStyle),
                   pw.Divider(color: PdfColors.grey600),
                   _summaryRow(
                     'TOTAL',
