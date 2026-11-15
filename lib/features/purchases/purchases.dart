@@ -608,7 +608,7 @@ class _RetailData {
   final List<Supplier> suppliers;
   final List<Purchase> purchases;
   final List<Expense> expenses;
-  final List<StockBatch> expiring;
+  final List<StockBatchRow> expiring;
   final List<Item> items;
   final List<StockAdjustment> adjustments;
 }
