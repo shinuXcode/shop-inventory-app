@@ -210,7 +210,7 @@ class DashboardPage extends ConsumerWidget {
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     Text(
-                                      MoneyFormatter.format(value).replaceAll(RegExp(r'\\.00,
+                                      MoneyFormatter.format(value),
                                       style: Theme.of(context)
                                           .textTheme
                                           .labelSmall,
