@@ -165,7 +165,11 @@ class InvoicePdfService {
                 children: [
                   pw.Text('Invoice: ${_safePdfText(invoice.invoiceNumber)}', style: bodyStyle),
                   pw.Text(
-                    invoice.gstSupplyType == 'interState' ? 'Supply: INTER-STATE' : 'Supply: INTRA-STATE',
+                    invoice.gstSupplyType == 'interState'
+                        ? 'Supply: INTER-STATE'
+                        : invoice.gstSupplyType == 'intraState'
+                            ? 'Supply: INTRA-STATE'
+                            : 'Supply type: NOT RECORDED',
                     style: bodyStyle,
                   ),
                   pw.Text(_date.format(invoice.createdAt.toLocal()), style: bodyStyle),
