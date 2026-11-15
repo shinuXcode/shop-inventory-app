@@ -329,4 +329,32 @@ void main() {
     expect(lines.single.id, 'merge-purchase-line');
   });
 
+
+  test('restore rejects backup rows with broken parent references before writing', () async {
+    final db = AppDatabase.forTesting();
+    addTearDown(db.close);
+    final invalidSnapshot = <String, dynamic>{
+      'format': 'sbill-backup-v1',
+      'items': [
+        {'id': 'orphan-item', 'name': 'Orphan Item'},
+      ],
+      'invoiceItems': [
+        {
+          'id': 'orphan-line',
+          'invoiceId': 'missing-invoice',
+          'itemId': 'orphan-item',
+          'itemNameSnapshot': 'Orphan Item',
+        },
+      ],
+    };
+
+    expect(AppDatabase.validateBackupSnapshot(invalidSnapshot), isNotEmpty);
+    await expectLater(
+      db.importSnapshot(invalidSnapshot),
+      throwsA(isA<ArgumentError>()),
+    );
+    expect(await db.select(db.items).get(), isEmpty);
+    expect(await db.select(db.invoiceItems).get(), isEmpty);
+  });
+
 }
