@@ -25,7 +25,7 @@ class ImportPreview {
   final String? error;
   final List<String> validationErrors;
 
-  bool get isValid => error == null;
+  bool get isValid => error == null && validationErrors.isEmpty;
   String get label => switch (kind) {
     'backup' => 'SBILL backup',
     'products' => 'Products',
