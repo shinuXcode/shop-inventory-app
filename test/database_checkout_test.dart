@@ -67,6 +67,11 @@ void main() {
     expect(invoice.gstSupplyType, 'intraState');
     expect(invoice.totalMinor, 45784);
     expect(invoice.paymentMethod, 'upi');
+    final gst = await db.gstSummaryBetween(DateTime(2026), DateTime(2027));
+    expect(gst.cgstMinor, 3492);
+    expect(gst.sgstMinor, 3492);
+    expect(gst.igstMinor, 0);
+    expect(gst.totalMinor, 6984);
     expect((await db.select(db.syncQueue).get()).length, 3);
   });
 
