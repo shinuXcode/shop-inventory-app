@@ -210,7 +210,7 @@ class InvoicePdfService {
           pw.Align(
             alignment: pw.Alignment.centerRight,
             child: pw.Container(
-              width: thermal ? double.infinity : 250,
+              width: thermal ? 72 * PdfPageFormat.mm : 250,
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                 children: [
