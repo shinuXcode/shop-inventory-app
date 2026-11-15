@@ -10,6 +10,7 @@ import '../../core/billing/billing_calculator.dart';
 import '../../core/billing/indian_gst.dart';
 import '../../core/billing/money_formatter.dart';
 import '../../core/database/app_database.dart';
+import '../../core/widgets/user_facing_error.dart';
 import '../../core/settings/app_settings.dart';
 
 final cartProvider = NotifierProvider<CartController, List<CartLine>>(CartController.new);
@@ -590,7 +591,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Checkout could not be completed. Your cart is still safe.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingError(e, fallback: 'Checkout could not be completed. Your cart is still safe.'))));
     } finally {
       if (mounted) setState(() => busy = false);
     }
