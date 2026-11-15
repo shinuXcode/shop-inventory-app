@@ -944,7 +944,9 @@ class AppDatabase extends _$AppDatabase {
       'invoices': invoiceRows.map((x) => {
         'id': x.id, 'invoiceNumber': x.invoiceNumber, 'customerId': x.customerId,
         'subtotalMinor': x.subtotalMinor, 'discountMinor': x.discountMinor,
-        'taxMinor': x.taxMinor, 'totalMinor': x.totalMinor, 'paymentMethod': x.paymentMethod,
+        'taxMinor': x.taxMinor, 'cgstMinor': x.cgstMinor, 'sgstMinor': x.sgstMinor,
+        'igstMinor': x.igstMinor, 'gstSupplyType': x.gstSupplyType,
+        'totalMinor': x.totalMinor, 'paymentMethod': x.paymentMethod,
         'status': x.status, 'notes': x.notes,
         'createdAt': x.createdAt.toIso8601String(), 'updatedAt': x.updatedAt.toIso8601String(),
       }).toList(),
