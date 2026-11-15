@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import '../billing/billing_calculator.dart';
+import '../billing/indian_gst.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
@@ -48,6 +49,10 @@ class Invoices extends Table {
   IntColumn get subtotalMinor => integer()();
   IntColumn get discountMinor => integer().withDefault(const Constant(0))();
   IntColumn get taxMinor => integer().withDefault(const Constant(0))();
+  IntColumn get cgstMinor => integer().withDefault(const Constant(0))();
+  IntColumn get sgstMinor => integer().withDefault(const Constant(0))();
+  IntColumn get igstMinor => integer().withDefault(const Constant(0))();
+  TextColumn get gstSupplyType => text().withDefault(const Constant('intraState'))();
   IntColumn get totalMinor => integer()();
   TextColumn get paymentMethod => text()();
   TextColumn get status => text().withDefault(const Constant('completed'))();
@@ -69,6 +74,9 @@ class InvoiceItems extends Table {
   IntColumn get unitPriceMinor => integer()();
   IntColumn get unitCostMinor => integer().withDefault(const Constant(0))();
   IntColumn get lineDiscountMinor => integer().withDefault(const Constant(0))();
+  IntColumn get cgstMinor => integer().withDefault(const Constant(0))();
+  IntColumn get sgstMinor => integer().withDefault(const Constant(0))();
+  IntColumn get igstMinor => integer().withDefault(const Constant(0))();
   RealColumn get taxRate => real()();
   IntColumn get taxMinor => integer()();
   IntColumn get lineTotalMinor => integer()();
@@ -170,7 +178,7 @@ class TopSellingItem {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
-  @override int get schemaVersion => 3;
+  @override int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -187,6 +195,15 @@ class AppDatabase extends _$AppDatabase {
           if (from < 3) {
             await m.addColumn(invoiceItems, invoiceItems.unitCostMinor);
             await m.addColumn(invoiceItems, invoiceItems.lineDiscountMinor);
+          }
+          if (from < 4) {
+            await m.addColumn(invoices, invoices.cgstMinor);
+            await m.addColumn(invoices, invoices.sgstMinor);
+            await m.addColumn(invoices, invoices.igstMinor);
+            await m.addColumn(invoices, invoices.gstSupplyType);
+            await m.addColumn(invoiceItems, invoiceItems.cgstMinor);
+            await m.addColumn(invoiceItems, invoiceItems.sgstMinor);
+            await m.addColumn(invoiceItems, invoiceItems.igstMinor);
           }
         },
         beforeOpen: (details) async {
@@ -635,6 +652,7 @@ class AppDatabase extends _$AppDatabase {
     String? customerId,
     required int discountMinor,
     required String paymentMethod,
+    GstSupplyType gstSupplyType = GstSupplyType.intraState,
   }) async {
     if (cart.isEmpty) throw ArgumentError('Cart is empty.');
     if (paymentMethod.trim().isEmpty) {
@@ -678,9 +696,20 @@ class AppDatabase extends _$AppDatabase {
           taxRateBps: (current.taxRate * 100).round(),
         );
       }).toList();
-      final totals = const BillingCalculator().calculate(
-        lines: effectiveLines,
+      final gstTotals = const IndianGstCalculator().calculateInvoice(
+        lines: effectiveLines.map((line) => GstLine(
+          unitPriceMinor: line.unitPriceMinor,
+          quantity: line.quantity,
+          rateBps: line.taxRateBps,
+        )).toList(),
+        supplyType: gstSupplyType,
         discountMinor: discountMinor,
+      );
+      final totals = BillingTotals(
+        subtotalMinor: gstTotals.subtotalMinor,
+        taxMinor: gstTotals.taxMinor,
+        discountMinor: gstTotals.discountMinor,
+        totalMinor: gstTotals.totalMinor,
       );
 
       await into(invoices).insert(InvoicesCompanion.insert(
@@ -690,6 +719,10 @@ class AppDatabase extends _$AppDatabase {
         subtotalMinor: totals.subtotalMinor,
         discountMinor: Value(totals.discountMinor),
         taxMinor: Value(totals.taxMinor),
+        cgstMinor: Value(gstTotals.cgstMinor),
+        sgstMinor: Value(gstTotals.sgstMinor),
+        igstMinor: Value(gstTotals.igstMinor),
+        gstSupplyType: Value(gstSupplyType.name),
         totalMinor: totals.totalMinor,
         paymentMethod: paymentMethod.trim().toLowerCase(),
         createdAt: now,
@@ -711,10 +744,16 @@ class AppDatabase extends _$AppDatabase {
         remainingDiscount -= lineDiscount;
         remainingSubtotal -= lineSubtotal;
 
-        final lineTax = const BillingCalculator().taxFor(
-          lineSubtotal - lineDiscount,
-          (current.taxRate * 100).round(),
+        final gstLine = const IndianGstCalculator().calculateLine(
+          line: GstLine(
+            unitPriceMinor: current.priceMinor,
+            quantity: line.quantity,
+            rateBps: (current.taxRate * 100).round(),
+          ),
+          supplyType: gstSupplyType,
+          discountMinor: lineDiscount,
         );
+        final lineTax = gstLine.taxMinor;
         await into(invoiceItems).insert(InvoiceItemsCompanion.insert(
           id: line.id,
           invoiceId: invoiceId,
@@ -726,6 +765,9 @@ class AppDatabase extends _$AppDatabase {
           taxRate: current.taxRate,
           unitCostMinor: Value(current.costMinor),
           lineDiscountMinor: Value(lineDiscount),
+          cgstMinor: Value(gstLine.cgstMinor),
+          sgstMinor: Value(gstLine.sgstMinor),
+          igstMinor: Value(gstLine.igstMinor),
           taxMinor: lineTax,
           lineTotalMinor: lineSubtotal - lineDiscount + lineTax,
         ));
@@ -844,6 +886,7 @@ class AppDatabase extends _$AppDatabase {
         'itemNameSnapshot': x.itemNameSnapshot, 'skuSnapshot': x.skuSnapshot,
         'quantity': x.quantity, 'unitPriceMinor': x.unitPriceMinor,
         'unitCostMinor': x.unitCostMinor, 'lineDiscountMinor': x.lineDiscountMinor,
+        'cgstMinor': x.cgstMinor, 'sgstMinor': x.sgstMinor, 'igstMinor': x.igstMinor,
         'taxRate': x.taxRate, 'taxMinor': x.taxMinor, 'lineTotalMinor': x.lineTotalMinor,
       }).toList(),
       'suppliers': supplierRows.map((x) => {
@@ -1098,6 +1141,10 @@ class AppDatabase extends _$AppDatabase {
           subtotalMinor: Value(_number(row['subtotalMinor'])),
           discountMinor: Value(_number(row['discountMinor'])),
           taxMinor: Value(_number(row['taxMinor'])),
+          cgstMinor: Value(_number(row['cgstMinor'])),
+          sgstMinor: Value(_number(row['sgstMinor'])),
+          igstMinor: Value(_number(row['igstMinor'])),
+          gstSupplyType: Value(row['gstSupplyType']?.toString() ?? 'intraState'),
           totalMinor: Value(_number(row['totalMinor'])),
           paymentMethod: Value(row['paymentMethod'].toString()),
           status: Value(row['status']?.toString() ?? 'completed'),
@@ -1123,6 +1170,9 @@ class AppDatabase extends _$AppDatabase {
           unitPriceMinor: Value(_number(row['unitPriceMinor'])),
           unitCostMinor: Value(_number(row['unitCostMinor'])),
           lineDiscountMinor: Value(_number(row['lineDiscountMinor'])),
+          cgstMinor: Value(_number(row['cgstMinor'])),
+          sgstMinor: Value(_number(row['sgstMinor'])),
+          igstMinor: Value(_number(row['igstMinor'])),
           taxRate: Value(_decimal(row['taxRate'])),
           taxMinor: Value(_number(row['taxMinor'])),
           lineTotalMinor: Value(_number(row['lineTotalMinor'])),
