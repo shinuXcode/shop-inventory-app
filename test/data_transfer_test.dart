@@ -161,7 +161,11 @@ void main() {
         invoiceNumber: 'INV-RESTORE',
         customerId: const Value('restore-customer'),
         subtotalMinor: 12500,
-        totalMinor: 12500,
+        taxMinor: 1800,
+        cgstMinor: 900,
+        sgstMinor: 900,
+        gstSupplyType: const Value('intraState'),
+        totalMinor: 14300,
         paymentMethod: 'cash',
         createdAt: now,
         updatedAt: now,
@@ -182,7 +186,12 @@ void main() {
       expect(restored, 4);
       expect((await target.select(target.items).getSingle()).name, 'Restore Item');
       expect((await target.select(target.customers).getSingle()).name, 'Restore Customer');
-      expect((await target.select(target.invoices).getSingle()).invoiceNumber, 'INV-RESTORE');
+      final restoredInvoice = await target.select(target.invoices).getSingle();
+      expect(restoredInvoice.invoiceNumber, 'INV-RESTORE');
+      expect(restoredInvoice.cgstMinor, 900);
+      expect(restoredInvoice.sgstMinor, 900);
+      expect(restoredInvoice.igstMinor, 0);
+      expect(restoredInvoice.gstSupplyType, 'intraState');
       expect((await target.select(target.invoiceItems).getSingle()).itemNameSnapshot, 'Restore Item');
     });
 
