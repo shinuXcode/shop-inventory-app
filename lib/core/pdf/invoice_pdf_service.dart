@@ -25,7 +25,7 @@ class InvoicePdfService {
       '${currencyCode.trim().isEmpty ? 'INR' : currencyCode.trim().toUpperCase()} ${_amount.format(minor / 100)}';
 
   String _safePdfText(String value) {
-    return value
+    final normalized = value
         .replaceAll('₹', 'INR ')
         .replaceAll('—', '-')
         .replaceAll('–', '-')
@@ -36,10 +36,14 @@ class InvoicePdfService {
         .replaceAll('‘', "'")
         .replaceAll('’', "'")
         .replaceAll('\u00a0', ' ')
-        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '')
-        .runes
-        .map((rune) => rune <= 255 ? String.fromCharCode(rune) : '?')
-        .join();
+        .replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '');
+    if (normalized.runes.any((rune) => rune > 255)) {
+      throw UnsupportedError(
+        'This PDF font cannot render Devanagari or other complex scripts yet. '
+        'Use Latin text for this invoice until Unicode font embedding is available.',
+      );
+    }
+    return normalized;
   }
 
   String _safeFilename(String value) {
