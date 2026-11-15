@@ -328,6 +328,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
     final name = TextEditingController(text: item?.name ?? '');
     final sku = TextEditingController(text: item?.sku ?? '');
     final barcode = TextEditingController(text: item?.barcode ?? '');
+    final hsnSac = TextEditingController(text: item?.hsnSac ?? '');
     final category = TextEditingController(text: item?.category ?? '');
     final price = TextEditingController(
       text: item == null ? '' : (item.priceMinor / 100).toStringAsFixed(2),
@@ -365,6 +366,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                   TextField(
                     controller: barcode,
                     decoration: const InputDecoration(labelText: 'Barcode'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: hsnSac,
+                    decoration: const InputDecoration(labelText: 'HSN / SAC code'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -486,6 +492,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                     ? null
                     : barcode.text.trim(),
               ),
+              hsnSac: Value(hsnSac.text.trim().isEmpty ? null : hsnSac.text.trim()),
               createdAt: now,
               updatedAt: now,
             )
@@ -509,6 +516,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                     ? null
                     : barcode.text.trim(),
               ),
+              hsnSac: Value(hsnSac.text.trim().isEmpty ? null : hsnSac.text.trim()),
               updatedAt: Value(now),
               isActive: const Value(true),
             );
@@ -518,6 +526,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       name.dispose();
       sku.dispose();
       barcode.dispose();
+      hsnSac.dispose();
       category.dispose();
       price.dispose();
       tax.dispose();
