@@ -84,4 +84,54 @@ void main() {
     expect((await db.select(db.items).getSingle()).stockQuantity, 2);
     expect((await db.select(db.syncQueue).get()).length, 1);
   });
+
+  test('stale cart cannot oversell stock after another checkout', () async {
+    final staleItem = await seedItem(stock: 10);
+
+    await db.checkout(
+      invoiceId: 'invoice-first',
+      invoiceNumber: 'INV-FIRST',
+      cart: [CartLine(id: 'line-first', item: staleItem, quantity: 7)],
+      discountMinor: 0,
+      paymentMethod: 'cash',
+    );
+
+    await expectLater(
+      db.checkout(
+        invoiceId: 'invoice-second',
+        invoiceNumber: 'INV-SECOND',
+        cart: [CartLine(id: 'line-second', item: staleItem, quantity: 7)],
+        discountMinor: 0,
+        paymentMethod: 'cash',
+      ),
+      throwsStateError,
+    );
+
+    expect((await db.select(db.items).getSingle()).stockQuantity, 3);
+    expect((await db.select(db.invoices).get()).length, 1);
+  });
+
+  test('concurrent checkouts cannot sell the same final unit twice', () async {
+    final item = await seedItem(stock: 1);
+
+    Future<bool> attempt(String suffix) async {
+      try {
+        await db.checkout(
+          invoiceId: 'invoice-$suffix',
+          invoiceNumber: 'INV-$suffix',
+          cart: [CartLine(id: 'line-$suffix', item: item, quantity: 1)],
+          discountMinor: 0,
+          paymentMethod: 'cash',
+        );
+        return true;
+      } on StateError {
+        return false;
+      }
+    }
+
+    final outcomes = await Future.wait([attempt('a'), attempt('b')]);
+    expect(outcomes.where((success) => success), hasLength(1));
+    expect((await db.select(db.items).getSingle()).stockQuantity, 0);
+    expect((await db.select(db.invoices).get()).length, 1);
+  });
 }
