@@ -18,6 +18,7 @@ final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) as
   final end = start.add(const Duration(days: 1));
   final grossProfit = await db.grossProfitBetween(start, end);
   final expenses = await db.expensesBetween(start, end);
+  final gstSummary = await db.gstSummaryBetween(start, end);
   return DashboardData(
     invoices: invoices,
     lowStock: lowStock,
@@ -25,11 +26,12 @@ final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) as
     creditOutstanding: creditOutstanding,
     grossProfit: grossProfit,
     expenses: expenses,
+    gstSummary: gstSummary,
   );
 });
 
 class DashboardData {
-  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers, required this.creditOutstanding, required this.grossProfit, required this.expenses});
+  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers, required this.creditOutstanding, required this.grossProfit, required this.expenses, required this.gstSummary});
 
   final List<Invoice> invoices;
   final int lowStock;
@@ -37,6 +39,7 @@ class DashboardData {
   final int creditOutstanding;
   final int grossProfit;
   final int expenses;
+  final GstSummary gstSummary;
 }
 
 class DashboardPage extends ConsumerWidget {
@@ -150,6 +153,29 @@ class DashboardPage extends ConsumerWidget {
                     ],
                   );
                 },
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('GST collected today', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 20,
+                        runSpacing: 8,
+                        children: [
+                          _gstValue(context, 'CGST', data.gstSummary.cgstMinor),
+                          _gstValue(context, 'SGST', data.gstSummary.sgstMinor),
+                          _gstValue(context, 'IGST', data.gstSummary.igstMinor),
+                          _gstValue(context, 'Total GST', data.gstSummary.totalMinor),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 18),
               Text(
@@ -321,6 +347,17 @@ class DashboardPage extends ConsumerWidget {
         onPressed: () => Shell.navigateTo(context, destination),
         icon: Icon(icon),
         label: Text(label),
+      );
+
+  Widget _gstValue(BuildContext context, String label, int amount) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
+          Text(
+            MoneyFormatter.format(amount),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
       );
 
   Widget _metric(
