@@ -245,6 +245,7 @@ class SyncService {
           .from(table)
           .select()
           .eq('business_id', businessId)
+          .order('id')
           .range(offset, offset + pageSize - 1);
       final batch = List<Map<String, dynamic>>.from(page);
       rows.addAll(batch);
