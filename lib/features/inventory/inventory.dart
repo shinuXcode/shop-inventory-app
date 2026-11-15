@@ -452,6 +452,172 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
 
       final normalizedSku = sku.text.trim();
       final normalizedBarcode = barcode.text.trim();
+      final normalizedHsnSac = hsnSac.text.trim();
+      if (normalizedHsnSac.isNotEmpty &&
+          !RegExp(r'^\\d{4}(?:\\d{2}){0,2}
+      final duplicate = await ref.read(databaseProvider).findItemConflict(
+        sku: normalizedSku,
+        barcode: normalizedBarcode,
+        excludingId: item?.id,
+      );
+      if (duplicate != null) {
+        final reason = normalizedSku.isNotEmpty &&
+                duplicate.sku?.trim().toLowerCase() == normalizedSku.toLowerCase()
+            ? 'SKU'
+            : 'barcode';
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('That $reason is already used by “${duplicate.name}”. Choose a unique value.')),
+        );
+        return;
+      }
+
+      final now = DateTime.now();
+      final id = item?.id ?? const Uuid().v4();
+      final companion = item == null
+          ? ItemsCompanion.insert(
+              id: id,
+              sku: Value(
+                sku.text.trim().isEmpty ? null : sku.text.trim(),
+              ),
+              name: name.text.trim(),
+              priceMinor: (priceRupees * 100).round(),
+              taxRate: Value(taxRate),
+              stockQuantity: Value(stockValue),
+              lowStockThreshold: Value(threshold),
+              category: Value(
+                category.text.trim().isEmpty
+                    ? null
+                    : category.text.trim(),
+              ),
+              barcode: Value(
+                barcode.text.trim().isEmpty
+                    ? null
+                    : barcode.text.trim(),
+              ),
+              hsnSac: Value(hsnSac.text.trim().isEmpty ? null : hsnSac.text.trim()),
+              createdAt: now,
+              updatedAt: now,
+            )
+          : ItemsCompanion(
+              id: Value(id),
+              sku: Value(
+                sku.text.trim().isEmpty ? null : sku.text.trim(),
+              ),
+              name: Value(name.text.trim()),
+              priceMinor: Value((priceRupees * 100).round()),
+              taxRate: Value(taxRate),
+              stockQuantity: Value(stockValue),
+              lowStockThreshold: Value(threshold),
+              category: Value(
+                category.text.trim().isEmpty
+                    ? null
+                    : category.text.trim(),
+              ),
+              barcode: Value(
+                barcode.text.trim().isEmpty
+                    ? null
+                    : barcode.text.trim(),
+              ),
+              hsnSac: Value(hsnSac.text.trim().isEmpty ? null : hsnSac.text.trim()),
+              updatedAt: Value(now),
+              isActive: const Value(true),
+            );
+
+      await ref.read(databaseProvider).saveItem(companion);
+    } finally {
+      name.dispose();
+      sku.dispose();
+      barcode.dispose();
+      hsnSac.dispose();
+      category.dispose();
+      price.dispose();
+      tax.dispose();
+      stock.dispose();
+      lowStock.dispose();
+    }
+  }
+
+  Future<void> _deactivate(BuildContext context, Item item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Archive product?'),
+        content: Text(
+          '“${item.name}” will disappear from active inventory but remain '
+          'in historical invoices.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Archive'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await ref.read(databaseProvider).saveItem(
+          ItemsCompanion(
+            id: Value(item.id),
+            isActive: const Value(false),
+            updatedAt: Value(DateTime.now()),
+          ),
+        );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip({
+    required this.label,
+    required this.icon,
+    this.emphasis = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool emphasis;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: emphasis
+            ? Theme.of(context).colorScheme.errorContainer
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+).hasMatch(normalizedHsnSac)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('HSN/SAC must contain 4, 6 or 8 digits.')),
+          );
+        }
+        return;
+      }
       final duplicate = await ref.read(databaseProvider).findItemConflict(
         sku: normalizedSku,
         barcode: normalizedBarcode,
