@@ -673,6 +673,20 @@ class AppDatabase extends _$AppDatabase {
     return row.read<int>('profit');
   }
 
+  Future<GstSummary> gstSummaryBetween(DateTime start, DateTime end) async {
+    final rows = await (select(invoices)
+          ..where((t) =>
+              t.createdAt.isBiggerOrEqualValue(start) &
+              t.createdAt.isSmallerThanValue(end) &
+              t.status.equals('completed')))
+        .get();
+    return GstSummary(
+      cgstMinor: rows.fold<int>(0, (sum, row) => sum + row.cgstMinor),
+      sgstMinor: rows.fold<int>(0, (sum, row) => sum + row.sgstMinor),
+      igstMinor: rows.fold<int>(0, (sum, row) => sum + row.igstMinor),
+    );
+  }
+
   Future<int> expensesBetween(DateTime start, DateTime end) async {
     final rows = await (select(expenses)
           ..where((t) =>
@@ -1442,6 +1456,19 @@ LazyDatabase _openConnection() => LazyDatabase(() async {
   return NativeDatabase.createInBackground(File(p.join(dir.path, 'sbill.sqlite')));
 });
 
+
+class GstSummary {
+  const GstSummary({
+    required this.cgstMinor,
+    required this.sgstMinor,
+    required this.igstMinor,
+  });
+
+  final int cgstMinor;
+  final int sgstMinor;
+  final int igstMinor;
+  int get totalMinor => cgstMinor + sgstMinor + igstMinor;
+}
 
 class CustomerStats {
   const CustomerStats({
