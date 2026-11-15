@@ -706,6 +706,12 @@ class AppDatabase extends _$AppDatabase {
         operation: 'upsert',
         createdAt: now,
       ));
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'invoice',
+        entityId: invoiceId,
+        operation: 'upsert',
+        createdAt: now,
+      ));
       return id;
     });
   }
