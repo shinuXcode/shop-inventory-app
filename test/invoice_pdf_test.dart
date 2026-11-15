@@ -17,6 +17,8 @@ void main() {
     igstMinor: 0,
     gstSupplyType: 'intraState',
     totalMinor: 11210,
+    paidMinor: 11210,
+    paymentStatus: 'paid',
     paymentMethod: 'upi',
     status: 'completed',
     notes: null,

@@ -196,7 +196,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
             leading: const Icon(Icons.receipt_long_outlined),
             title: Text(purchase.purchaseNumber),
             subtitle: Text(
-              '${supplier?.name ?? 'Supplier'} • ${DateFormat('dd MMM yyyy').format(purchase.createdAt)} • ${purchase.paymentStatus.toUpperCase()} • Due: ${_money((purchase.totalMinor - purchase.paidMinor).clamp(0, purchase.totalMinor))}',
+              '${supplier?.name ?? 'Supplier'} • ${DateFormat('dd MMM yyyy').format(purchase.createdAt)} • ${purchase.paymentStatus.toUpperCase()} • Due: ${_money((purchase.totalMinor - purchase.paidMinor).clamp(0, purchase.totalMinor).toInt())}',
             ),
             trailing: IconButton(
               tooltip: purchase.totalMinor > purchase.paidMinor ? 'Record supplier payment' : 'Fully paid',
@@ -220,7 +220,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
 
 
   Future<void> _recordSupplierPayment(Purchase purchase) async {
-    final outstanding = (purchase.totalMinor - purchase.paidMinor).clamp(0, purchase.totalMinor);
+    final outstanding = (purchase.totalMinor - purchase.paidMinor).clamp(0, purchase.totalMinor).toInt();
     if (outstanding <= 0) return;
     final amount = TextEditingController();
     String method = 'cash';

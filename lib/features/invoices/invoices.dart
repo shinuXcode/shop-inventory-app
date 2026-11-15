@@ -94,7 +94,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
             .toList();
     final returns = await db.salesReturnsForInvoice(invoice.id);
     final returnedMinor = returns.fold<int>(0, (sum, row) => sum + row.totalMinor);
-    final outstandingMinor = (invoice.totalMinor - invoice.paidMinor - returnedMinor).clamp(0, invoice.totalMinor);
+    final outstandingMinor = (invoice.totalMinor - invoice.paidMinor - returnedMinor).clamp(0, invoice.totalMinor).toInt();
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -232,7 +232,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
   Future<void> _recordPayment(Invoice invoice) async {
     final priorReturns = await ref.read(databaseProvider).salesReturnsForInvoice(invoice.id);
     final returnedMinor = priorReturns.fold<int>(0, (sum, row) => sum + row.totalMinor);
-    final outstandingMinor = (invoice.totalMinor - invoice.paidMinor - returnedMinor).clamp(0, invoice.totalMinor);
+    final outstandingMinor = (invoice.totalMinor - invoice.paidMinor - returnedMinor).clamp(0, invoice.totalMinor).toInt();
     if (outstandingMinor <= 0) return;
     final amount = TextEditingController();
     String method = 'cash';
