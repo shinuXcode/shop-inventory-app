@@ -52,7 +52,8 @@ void main() {
 
     final saved = await (db.select(db.items)..where((t) => t.id.equals('item-1'))).getSingle();
     expect(saved.stockQuantity, 15);
-    expect(saved.costMinor, 5000);
+    // Existing 10 units at 4,000 plus 5 new units at 5,000 gives a weighted average of 4,333.
+    expect(saved.costMinor, 4333);
     expect(await db.supplierOutstandingMinor('supplier-1'), 19500);
     expect((await db.recentPurchases()).single.paymentStatus, 'partial');
     expect((await db.expiringStock(withinDays: 120)), hasLength(1));
