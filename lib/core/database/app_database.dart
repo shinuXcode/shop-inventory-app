@@ -952,11 +952,19 @@ class AppDatabase extends _$AppDatabase {
     final customerRows = (snapshot['customers'] as List?)?.whereType<Map>().toList() ?? const [];
     final invoiceRows = (snapshot['invoices'] as List?)?.whereType<Map>().toList() ?? const [];
     final invoiceItemRows = (snapshot['invoiceItems'] as List?)?.whereType<Map>().toList() ?? const [];
+    final supplierRows = (snapshot['suppliers'] as List?)?.whereType<Map>().toList() ?? const [];
+    final purchaseRows = (snapshot['purchases'] as List?)?.whereType<Map>().toList() ?? const [];
+    final purchaseItemRows = (snapshot['purchaseItems'] as List?)?.whereType<Map>().toList() ?? const [];
+    final expenseRows = (snapshot['expenses'] as List?)?.whereType<Map>().toList() ?? const [];
+    final adjustmentRows = (snapshot['stockAdjustments'] as List?)?.whereType<Map>().toList() ?? const [];
+    final batchRows = (snapshot['stockBatches'] as List?)?.whereType<Map>().toList() ?? const [];
 
     var imported = 0;
     final importedItemIds = <String>[];
     final importedCustomerIds = <String>[];
     final importedInvoiceIds = <String>[];
+    final importedSupplierIds = <String>[];
+    final importedPurchaseIds = <String>[];
     final now = DateTime.now();
 
     await transaction(() async {
@@ -964,6 +972,12 @@ class AppDatabase extends _$AppDatabase {
       final existingCustomerIds = (await select(customers).get()).map((row) => row.id).toSet();
       final existingInvoiceIds = (await select(invoices).get()).map((row) => row.id).toSet();
       final existingInvoiceItemIds = (await select(invoiceItems).get()).map((row) => row.id).toSet();
+      final existingSupplierIds = (await select(suppliers).get()).map((row) => row.id).toSet();
+      final existingPurchaseIds = (await select(purchases).get()).map((row) => row.id).toSet();
+      final existingPurchaseItemIds = (await select(purchaseItems).get()).map((row) => row.id).toSet();
+      final existingExpenseIds = (await select(expenses).get()).map((row) => row.id).toSet();
+      final existingAdjustmentIds = (await select(stockAdjustments).get()).map((row) => row.id).toSet();
+      final existingBatchIds = (await select(stockBatches).get()).map((row) => row.id).toSet();
 
       for (final row in itemRows) {
         final id = row['id'].toString();
@@ -1047,6 +1061,103 @@ class AppDatabase extends _$AppDatabase {
         ));
         imported++;
       }
+      for (final row in supplierRows) {
+        final id = row['id'].toString();
+        if (existingSupplierIds.contains(id)) continue;
+        final createdAt = _rowDate(row['createdAt']) ?? now;
+        await into(suppliers).insert(SuppliersCompanion.insert(
+          id: id,
+          name: row['name'].toString(),
+          phone: Value(_nullable(row['phone'])),
+          email: Value(_nullable(row['email'])),
+          gstin: Value(_nullable(row['gstin'])),
+          address: Value(_nullable(row['address'])),
+          createdAt: createdAt,
+          updatedAt: _rowDate(row['updatedAt']) ?? createdAt,
+        ));
+        importedSupplierIds.add(id);
+        imported++;
+      }
+      for (final row in purchaseRows) {
+        final id = row['id'].toString();
+        if (existingPurchaseIds.contains(id)) continue;
+        final supplierId = row['supplierId'].toString();
+        final supplierExists = existingSupplierIds.contains(supplierId) ||
+            importedSupplierIds.contains(supplierId);
+        if (!supplierExists) continue;
+        await into(purchases).insert(PurchasesCompanion.insert(
+          id: id,
+          purchaseNumber: row['purchaseNumber'].toString(),
+          supplierId: supplierId,
+          subtotalMinor: _number(row['subtotalMinor']),
+          discountMinor: Value(_number(row['discountMinor'])),
+          taxMinor: Value(_number(row['taxMinor'])),
+          totalMinor: _number(row['totalMinor']),
+          paidMinor: Value(_number(row['paidMinor'])),
+          paymentStatus: Value(row['paymentStatus']?.toString() ?? 'unpaid'),
+          notes: Value(_nullable(row['notes'])),
+          createdAt: _rowDate(row['createdAt']) ?? now,
+        ));
+        importedPurchaseIds.add(id);
+        imported++;
+      }
+      for (final row in purchaseItemRows) {
+        final id = row['id'].toString();
+        final purchaseId = row['purchaseId'].toString();
+        if (existingPurchaseItemIds.contains(id) ||
+            !importedPurchaseIds.contains(purchaseId)) continue;
+        await into(purchaseItems).insert(PurchaseItemsCompanion.insert(
+          id: id,
+          purchaseId: purchaseId,
+          itemId: row['itemId'].toString(),
+          itemNameSnapshot: row['itemNameSnapshot'].toString(),
+          quantity: _number(row['quantity']),
+          unitCostMinor: _number(row['unitCostMinor']),
+          taxRate: _decimal(row['taxRate']),
+          taxMinor: _number(row['taxMinor']),
+          lineTotalMinor: _number(row['lineTotalMinor']),
+        ));
+        imported++;
+      }
+      for (final row in expenseRows) {
+        final id = row['id'].toString();
+        if (existingExpenseIds.contains(id)) continue;
+        await into(expenses).insert(ExpensesCompanion.insert(
+          id: id,
+          category: row['category'].toString(),
+          description: Value(_nullable(row['description'])),
+          amountMinor: _number(row['amountMinor']),
+          paymentMethod: Value(row['paymentMethod']?.toString() ?? 'cash'),
+          incurredAt: _rowDate(row['incurredAt']) ?? now,
+        ));
+        imported++;
+      }
+      for (final row in adjustmentRows) {
+        final id = row['id'].toString();
+        if (existingAdjustmentIds.contains(id)) continue;
+        await into(stockAdjustments).insert(StockAdjustmentsCompanion.insert(
+          id: id,
+          itemId: row['itemId'].toString(),
+          quantityDelta: _number(row['quantityDelta']),
+          reason: row['reason'].toString(),
+          createdAt: _rowDate(row['createdAt']) ?? now,
+        ));
+        imported++;
+      }
+      for (final row in batchRows) {
+        final id = row['id'].toString();
+        if (existingBatchIds.contains(id)) continue;
+        await into(stockBatches).insert(StockBatchesCompanion.insert(
+          id: id,
+          itemId: row['itemId'].toString(),
+          purchaseItemId: Value(_nullable(row['purchaseItemId'])),
+          quantity: _number(row['quantity']),
+          expiryDate: Value(_rowDate(row['expiryDate'])),
+          createdAt: _rowDate(row['createdAt']) ?? now,
+        ));
+        imported++;
+      }
+
       for (final id in importedItemIds) {
         await into(syncQueue).insert(SyncQueueCompanion.insert(
           entityType: 'item', entityId: id, operation: 'upsert', createdAt: DateTime.now(),
@@ -1111,6 +1222,12 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> clearLocalData() async {
     await transaction(() async {
+      await delete(purchaseItems).go();
+      await delete(stockBatches).go();
+      await delete(purchases).go();
+      await delete(suppliers).go();
+      await delete(expenses).go();
+      await delete(stockAdjustments).go();
       await delete(invoiceItems).go();
       await delete(invoices).go();
       await delete(customers).go();
