@@ -257,7 +257,9 @@ class DataTransferService {
         final taxText = _rowValue(row, const ['tax', 'tax_rate', 'gst']);
         final stockText = _rowValue(row, const ['stock', 'quantity', 'stock_quantity']);
         final price = double.tryParse(priceText.replaceAll(RegExp(r'[^0-9.\-]'), ''));
-        final tax = double.tryParse(taxText.replaceAll(RegExp(r'[^0-9.\-]'), ''));
+        final tax = taxText.isEmpty
+            ? 0.0
+            : double.tryParse(taxText.replaceAll(RegExp(r'[^0-9.\-]'), ''));
         final stock = int.tryParse(stockText.isEmpty ? '0' : stockText);
         if (price == null || !price.isFinite || price < 0) errors.add('Row ' + number.toString() + ': price must be a valid non-negative number.');
         if (tax == null || !tax.isFinite || tax < 0 || tax > 100) errors.add('Row ' + number.toString() + ': tax must be between 0 and 100%.');
