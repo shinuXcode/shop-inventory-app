@@ -118,7 +118,11 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                   itemBuilder: (_, i) => ListTile(
                     dense: true,
                     title: Text(items[i].itemNameSnapshot),
-                    subtitle: Text(items[i].quantity.toString() + ' × ' + money(items[i].unitPriceMinor)),
+                    subtitle: Text([
+                      items[i].quantity.toString() + ' × ' + money(items[i].unitPriceMinor),
+                      if ((items[i].skuSnapshot ?? '').isNotEmpty) 'SKU: ${items[i].skuSnapshot}',
+                      if ((items[i].hsnSacSnapshot ?? '').isNotEmpty) 'HSN/SAC: ${items[i].hsnSacSnapshot}',
+                    ].join(' • ')),
                     trailing: Text(money(items[i].lineTotalMinor)),
                   ),
                 ),
@@ -127,6 +131,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text(invoice.gstSupplyType == 'interState' ? 'Supply: Inter-state' : 'Supply: Intra-state'),
                   Text('Subtotal: ' + money(invoice.subtotalMinor)),
                   Text('Discount: -' + money(invoice.discountMinor)),
                   if (invoice.cgstMinor > 0) Text('CGST: ' + money(invoice.cgstMinor)),
