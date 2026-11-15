@@ -83,6 +83,75 @@ class SyncQueue extends Table {
   TextColumn get lastError => text().nullable()();
 }
 
+class Suppliers extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get email => text().nullable()();
+  TextColumn get gstin => text().nullable()();
+  TextColumn get address => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
+class Purchases extends Table {
+  TextColumn get id => text()();
+  TextColumn get purchaseNumber => text()();
+  TextColumn get supplierId => text()();
+  IntColumn get subtotalMinor => integer()();
+  IntColumn get discountMinor => integer().withDefault(const Constant(0))();
+  IntColumn get taxMinor => integer().withDefault(const Constant(0))();
+  IntColumn get totalMinor => integer()();
+  IntColumn get paidMinor => integer().withDefault(const Constant(0))();
+  TextColumn get paymentStatus => text().withDefault(const Constant('unpaid'))();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
+class PurchaseItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get purchaseId => text()();
+  TextColumn get itemId => text()();
+  TextColumn get itemNameSnapshot => text()();
+  IntColumn get quantity => integer()();
+  IntColumn get unitCostMinor => integer()();
+  RealColumn get taxRate => real()();
+  IntColumn get taxMinor => integer()();
+  IntColumn get lineTotalMinor => integer()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
+class Expenses extends Table {
+  TextColumn get id => text()();
+  TextColumn get category => text()();
+  TextColumn get description => text().nullable()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get paymentMethod => text().withDefault(const Constant('cash'))();
+  DateTimeColumn get incurredAt => dateTime()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
+class StockAdjustments extends Table {
+  TextColumn get id => text()();
+  TextColumn get itemId => text()();
+  IntColumn get quantityDelta => integer()();
+  TextColumn get reason => text()();
+  DateTimeColumn get createdAt => dateTime()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
+class StockBatches extends Table {
+  TextColumn get id => text()();
+  TextColumn get itemId => text()();
+  TextColumn get purchaseItemId => text().nullable()();
+  IntColumn get quantity => integer()();
+  DateTimeColumn get expiryDate => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
 class TopSellingItem {
   const TopSellingItem({
     required this.name,
@@ -95,11 +164,29 @@ class TopSellingItem {
   final int totalMinor;
 }
 
-@DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue])
+@DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments, StockBatches])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
-  @override int get schemaVersion => 1;
+  @override int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) async => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(suppliers);
+            await m.createTable(purchases);
+            await m.createTable(purchaseItems);
+            await m.createTable(expenses);
+            await m.createTable(stockAdjustments);
+            await m.createTable(stockBatches);
+          }
+        },
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
 
   Stream<List<Item>> watchActiveItems() => (select(items)
     ..where((t) => t.isActive.equals(true))
