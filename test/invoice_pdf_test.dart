@@ -76,4 +76,15 @@ void main() {
     expect(bytes.length, greaterThan(5000));
     expect(String.fromCharCodes(bytes.take(8)), startsWith('%PDF'));
   });
+
+  test('unsupported complex-script text fails clearly instead of rendering corrupt glyphs', () async {
+    await expectLater(
+      service.buildA4(
+        invoice: invoice(),
+        items: [item()],
+        shopName: 'दुकान',
+      ),
+      throwsUnsupportedError,
+    );
+  });
 }
