@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../app.dart';
 import '../../core/billing/billing_calculator.dart';
+import '../../core/billing/indian_gst.dart';
 import '../../core/billing/money_formatter.dart';
 import '../../core/database/app_database.dart';
 import '../../core/settings/app_settings.dart';
@@ -51,6 +52,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   List<Customer> customers = [];
   String? selectedCustomerId;
   String paymentMethod = 'cash';
+  GstSupplyType gstSupplyType = GstSupplyType.intraState;
   AppSettings? settings;
   bool busy = false;
   Timer? _searchDebounce;
@@ -122,6 +124,28 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     )).toList(),
     discountMinor: _discountMinor,
   );
+
+  GstInvoiceResult _gstTotals(List<CartLine> cart) {
+    if (cart.isEmpty) {
+      return const GstInvoiceResult(
+        subtotalMinor: 0,
+        discountMinor: 0,
+        taxableMinor: 0,
+        cgstMinor: 0,
+        sgstMinor: 0,
+        igstMinor: 0,
+      );
+    }
+    return const IndianGstCalculator().calculateInvoice(
+      lines: cart.map((line) => GstLine(
+        unitPriceMinor: line.item.priceMinor,
+        quantity: line.quantity,
+        rateBps: (line.item.taxRate * 100).round(),
+      )).toList(),
+      supplyType: gstSupplyType,
+      discountMinor: _discountMinor,
+    );
+  }
 
   int get _discountMinor {
     final parsed = double.tryParse(discount.text.trim()) ?? 0;
@@ -354,10 +378,44 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         ),
       ),
     ]),
+    const SizedBox(height: 10),
+    DropdownButtonFormField<GstSupplyType>(
+      initialValue: gstSupplyType,
+      decoration: const InputDecoration(
+        labelText: 'GST supply type',
+        isDense: true,
+      ),
+      items: const [
+        DropdownMenuItem(
+          value: GstSupplyType.intraState,
+          child: Text('Intra-state (CGST + SGST)'),
+        ),
+        DropdownMenuItem(
+          value: GstSupplyType.interState,
+          child: Text('Inter-state (IGST)'),
+        ),
+      ],
+      onChanged: (value) => setState(
+        () => gstSupplyType = value ?? GstSupplyType.intraState,
+      ),
+    ),
     const SizedBox(height: 6),
-    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const Text('Tax'), Text(_money(totals.taxMinor))
-    ]),
+    if (_gstTotals(cart).cgstMinor > 0)
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('CGST'), Text(_money(_gstTotals(cart).cgstMinor))
+      ]),
+    if (_gstTotals(cart).sgstMinor > 0)
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('SGST'), Text(_money(_gstTotals(cart).sgstMinor))
+      ]),
+    if (_gstTotals(cart).igstMinor > 0)
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('IGST'), Text(_money(_gstTotals(cart).igstMinor))
+      ]),
+    if (_gstTotals(cart).taxMinor == 0)
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('GST'), Text(_money(0))
+      ]),
     const Divider(),
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Text('TOTAL', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
@@ -514,6 +572,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
         customerId: selectedCustomerId,
         discountMinor: totals.discountMinor,
         paymentMethod: paymentMethod,
+        gstSupplyType: gstSupplyType,
       );
       ref.read(cartProvider.notifier).clear();
       if (!mounted) return;
