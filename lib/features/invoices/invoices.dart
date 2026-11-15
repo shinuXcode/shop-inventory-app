@@ -218,6 +218,11 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         phone: settings.businessPhone,
         gstNumber: settings.gstNumber,
         footerText: settings.invoiceFooter,
+        invoiceTitle: settings.invoiceTitle,
+        termsText: settings.invoiceTerms,
+        currencyCode: settings.currency,
+        showLogo: settings.showInvoiceLogo,
+        showSku: settings.showSkuOnInvoice,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
