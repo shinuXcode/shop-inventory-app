@@ -392,6 +392,21 @@ class AppDatabase extends _$AppDatabase {
       throw ArgumentError('Purchase quantities, costs or tax rates are invalid.');
     }
 
+    final quantities = <String, int>{};
+    final purchaseCosts = <String, int>{};
+    for (final line in lines) {
+      quantities.update(
+        line.itemId,
+        (value) => value + line.quantity,
+        ifAbsent: () => line.quantity,
+      );
+      purchaseCosts.update(
+        line.itemId,
+        (value) => value + line.unitCostMinor * line.quantity,
+        ifAbsent: () => line.unitCostMinor * line.quantity,
+      );
+    }
+
     await transaction(() async {
       final supplier = await (select(suppliers)
             ..where((t) => t.id.equals(supplierId)))
@@ -399,9 +414,9 @@ class AppDatabase extends _$AppDatabase {
       if (supplier == null) throw StateError('Select a valid supplier.');
 
       final currentItems = <String, Item>{};
-      for (final line in lines) {
+      for (final itemId in quantities.keys) {
         final item = await (select(items)
-              ..where((t) => t.id.equals(line.itemId)))
+              ..where((t) => t.id.equals(itemId)))
             .getSingleOrNull();
         if (item == null) {
           throw StateError('A purchased product no longer exists.');
@@ -473,14 +488,6 @@ class AppDatabase extends _$AppDatabase {
           taxMinor: tax,
           lineTotalMinor: base - allocatedDiscount + tax,
         ));
-        await (update(items)..where((t) => t.id.equals(item.id))).write(
-          ItemsCompanion(
-            stockQuantity: Value(item.stockQuantity + line.quantity),
-            costMinor: Value(line.unitCostMinor),
-            updatedAt: Value(now),
-            syncStatus: const Value('pending'),
-          ),
-        );
         await into(stockBatches).insert(StockBatchesCompanion.insert(
           id: const Uuid().v4(),
           itemId: item.id,
@@ -489,9 +496,27 @@ class AppDatabase extends _$AppDatabase {
           expiryDate: Value(line.expiryDate),
           createdAt: now,
         ));
+      }
+
+      for (final entry in quantities.entries) {
+        final item = currentItems[entry.key]!;
+        final newQuantity = item.stockQuantity + entry.value;
+        final weightedCost = newQuantity == 0
+            ? 0
+            : ((item.costMinor * item.stockQuantity + purchaseCosts[entry.key]!) /
+                    newQuantity)
+                .round();
+        await (update(items)..where((t) => t.id.equals(entry.key))).write(
+          ItemsCompanion(
+            stockQuantity: Value(newQuantity),
+            costMinor: Value(weightedCost),
+            updatedAt: Value(now),
+            syncStatus: const Value('pending'),
+          ),
+        );
         await into(syncQueue).insert(SyncQueueCompanion.insert(
           entityType: 'item',
-          entityId: item.id,
+          entityId: entry.key,
           operation: 'upsert',
           createdAt: now,
         ));
