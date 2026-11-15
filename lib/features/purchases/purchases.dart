@@ -47,7 +47,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
       suppliers: values[0] as List<Supplier>,
       purchases: values[1] as List<Purchase>,
       expenses: values[2] as List<Expense>,
-      expiring: values[3] as List<StockBatch>,
+      expiring: values[3] as List<StockBatchRow>,
       items: values[4] as List<Item>,
       adjustments: values[5] as List<StockAdjustment>,
     );
@@ -71,7 +71,12 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
         ],
         bottom: TabBar(
           controller: _tabs,
-          tabs: const [Tab(text: 'Suppliers'), Tab(text: 'Purchases'), Tab(text: 'Expenses')],
+          tabs: const [
+            Tab(text: 'Suppliers'),
+            Tab(text: 'Purchases'),
+            Tab(text: 'Expenses'),
+            Tab(text: 'Stock'),
+          ],
         ),
       ),
       body: FutureBuilder<_RetailData>(

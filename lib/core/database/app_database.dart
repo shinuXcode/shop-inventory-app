@@ -154,6 +154,7 @@ class StockAdjustments extends Table {
   @override Set<Column<Object>> get primaryKey => {id};
 }
 
+@DataClassName('StockBatchRow')
 class StockBatches extends Table {
   TextColumn get id => text()();
   TextColumn get itemId => text()();
@@ -489,7 +490,7 @@ class AppDatabase extends _$AppDatabase {
           taxMinor: tax,
           lineTotalMinor: base - allocatedDiscount + tax,
         ));
-        await into(stockBatches).insert(StockBatchesCompanion.insert(
+        await into(stockBatches).insert(StockBatchRowCompanion.insert(
           id: const Uuid().v4(),
           itemId: item.id,
           purchaseItemId: Value(line.id),
@@ -568,7 +569,7 @@ class AppDatabase extends _$AppDatabase {
       if (remaining == 0) break;
       final consumed = batch.quantity < remaining ? batch.quantity : remaining;
       await (update(stockBatches)..where((t) => t.id.equals(batch.id))).write(
-        StockBatchesCompanion(quantity: Value(batch.quantity - consumed)),
+        StockBatchRowCompanion(quantity: Value(batch.quantity - consumed)),
       );
       remaining -= consumed;
     }
@@ -609,7 +610,7 @@ class AppDatabase extends _$AppDatabase {
       if (quantityDelta < 0) {
         await _consumeStockBatches(itemId, -quantityDelta);
       } else {
-        await into(stockBatches).insert(StockBatchesCompanion.insert(
+        await into(stockBatches).insert(StockBatchRowCompanion.insert(
           id: const Uuid().v4(),
           itemId: itemId,
           quantity: quantityDelta,
@@ -632,7 +633,7 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  Future<List<StockBatch>> expiringStock({int withinDays = 30}) async {
+  Future<List<StockBatchRow>> expiringStock({int withinDays = 30}) async {
     final end = DateTime.now().add(Duration(days: withinDays));
     final rows = await (select(stockBatches)
           ..where((t) =>
@@ -1336,7 +1337,7 @@ class AppDatabase extends _$AppDatabase {
       for (final row in batchRows) {
         final id = row['id'].toString();
         if (existingBatchIds.contains(id)) continue;
-        await into(stockBatches).insert(StockBatchesCompanion.insert(
+        await into(stockBatches).insert(StockBatchRowCompanion.insert(
           id: id,
           itemId: row['itemId'].toString(),
           purchaseItemId: Value(_nullable(row['purchaseItemId'])),
