@@ -15,7 +15,7 @@
 - [x] Currency-code rendering in PDFs to avoid missing rupee glyphs
 - [x] Checkout re-reads stock in-transaction and conditionally decrements stock
 - [x] Deterministic integer-paise billing and discount allocation
-- [x] GST calculator unit tests for CGST, SGST and IGST
+- [x] GST calculator and invoice checkout tests for CGST, SGST and IGST
 - [x] Backup export/restore for new supplier, purchase, expense and expiry data
 - [x] Sync queue retry diagnostics and paginated cloud pulls
 - [x] Regression tests for stale carts, concurrent checkout, billing, PDF pagination, backup restore, purchases, expenses and stock adjustments
@@ -34,7 +34,8 @@
 
 ## Still required before production
 
-- [ ] Wire CGST/SGST/IGST selection and tax split into invoice checkout/storage/PDF (the calculator exists, but the full invoice flow is not yet integrated)
+- [x] Wire manual intra-state/inter-state GST selection and CGST/SGST/IGST split into invoice checkout, local storage, sync payloads and PDFs
+- [ ] Add automatic place-of-supply determination from seller/customer state codes and GSTIN
 - [ ] Embed and verify Devanagari/Unicode PDF fonts for Hindi and other scripts
 - [ ] Add direct ESC/POS thermal printing and cash-drawer support, or explicitly ship with OS print-dialog-only support
 - [ ] Add Supabase tables/RLS and sync queue handlers for suppliers, purchases, expenses, stock adjustments and expiry batches
