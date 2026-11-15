@@ -746,6 +746,12 @@ class AppDatabase extends _$AppDatabase {
     final customerRows = await select(customers).get();
     final invoiceRows = await select(invoices).get();
     final invoiceItemRows = await select(invoiceItems).get();
+    final supplierRows = await select(suppliers).get();
+    final purchaseRows = await select(purchases).get();
+    final purchaseItemRows = await select(purchaseItems).get();
+    final expenseRows = await select(expenses).get();
+    final adjustmentRows = await select(stockAdjustments).get();
+    final batchRows = await select(stockBatches).get();
     return {
       'format': 'sbill-backup-v1',
       'exportedAt': DateTime.now().toIso8601String(),
@@ -773,6 +779,38 @@ class AppDatabase extends _$AppDatabase {
         'itemNameSnapshot': x.itemNameSnapshot, 'skuSnapshot': x.skuSnapshot,
         'quantity': x.quantity, 'unitPriceMinor': x.unitPriceMinor,
         'taxRate': x.taxRate, 'taxMinor': x.taxMinor, 'lineTotalMinor': x.lineTotalMinor,
+      }).toList(),
+      'suppliers': supplierRows.map((x) => {
+        'id': x.id, 'name': x.name, 'phone': x.phone, 'email': x.email,
+        'gstin': x.gstin, 'address': x.address,
+        'createdAt': x.createdAt.toIso8601String(), 'updatedAt': x.updatedAt.toIso8601String(),
+      }).toList(),
+      'purchases': purchaseRows.map((x) => {
+        'id': x.id, 'purchaseNumber': x.purchaseNumber, 'supplierId': x.supplierId,
+        'subtotalMinor': x.subtotalMinor, 'discountMinor': x.discountMinor,
+        'taxMinor': x.taxMinor, 'totalMinor': x.totalMinor, 'paidMinor': x.paidMinor,
+        'paymentStatus': x.paymentStatus, 'notes': x.notes,
+        'createdAt': x.createdAt.toIso8601String(),
+      }).toList(),
+      'purchaseItems': purchaseItemRows.map((x) => {
+        'id': x.id, 'purchaseId': x.purchaseId, 'itemId': x.itemId,
+        'itemNameSnapshot': x.itemNameSnapshot, 'quantity': x.quantity,
+        'unitCostMinor': x.unitCostMinor, 'taxRate': x.taxRate,
+        'taxMinor': x.taxMinor, 'lineTotalMinor': x.lineTotalMinor,
+      }).toList(),
+      'expenses': expenseRows.map((x) => {
+        'id': x.id, 'category': x.category, 'description': x.description,
+        'amountMinor': x.amountMinor, 'paymentMethod': x.paymentMethod,
+        'incurredAt': x.incurredAt.toIso8601String(),
+      }).toList(),
+      'stockAdjustments': adjustmentRows.map((x) => {
+        'id': x.id, 'itemId': x.itemId, 'quantityDelta': x.quantityDelta,
+        'reason': x.reason, 'createdAt': x.createdAt.toIso8601String(),
+      }).toList(),
+      'stockBatches': batchRows.map((x) => {
+        'id': x.id, 'itemId': x.itemId, 'purchaseItemId': x.purchaseItemId,
+        'quantity': x.quantity, 'expiryDate': x.expiryDate?.toIso8601String(),
+        'createdAt': x.createdAt.toIso8601String(),
       }).toList(),
     };
   }
