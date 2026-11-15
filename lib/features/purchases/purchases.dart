@@ -23,7 +23,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _future = _load();
   }
 
@@ -41,6 +41,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
       db.recentExpenses(),
       db.expiringStock(),
       db.searchItems(''),
+      db.recentStockAdjustments(),
     ]);
     return _RetailData(
       suppliers: values[0] as List<Supplier>,
@@ -48,6 +49,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
       expenses: values[2] as List<Expense>,
       expiring: values[3] as List<StockBatch>,
       items: values[4] as List<Item>,
+      adjustments: values[5] as List<StockAdjustment>,
     );
   }
 
@@ -106,6 +108,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
                     _supplierList(data),
                     _purchaseList(data),
                     _expenseList(data),
+                    _stockList(data),
                   ],
                 ),
               ),
@@ -119,6 +122,7 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
             case 0: _addSupplier(); break;
             case 1: _recordPurchase(); break;
             case 2: _addExpense(); break;
+            case 3: _adjustStock(); break;
           }
         },
         icon: const Icon(Icons.add),
@@ -221,6 +225,60 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
           ),
         );
       },
+    );
+  }
+
+  Widget _stockList(_RetailData data) {
+    if (data.adjustments.isEmpty && data.expiring.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.inventory_2_outlined,
+        title: 'No stock activity yet',
+        message: 'Purchases and manual stock changes will appear here.',
+      );
+    }
+    final names = {for (final item in data.items) item.id: item.name};
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('Stock adjustment history', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (data.adjustments.isEmpty)
+          const Text('No manual adjustments recorded.')
+        else
+          ...data.adjustments.map((adjustment) => Card(
+            child: ListTile(
+              leading: Icon(
+                adjustment.quantityDelta > 0 ? Icons.add_circle_outline : Icons.remove_circle_outline,
+              ),
+              title: Text(names[adjustment.itemId] ?? 'Unknown product'),
+              subtitle: Text(
+                adjustment.reason + ' • ' + DateFormat('dd MMM yyyy, hh:mm a').format(adjustment.createdAt),
+              ),
+              trailing: Text(
+                (adjustment.quantityDelta > 0 ? '+' : '') + adjustment.quantityDelta.toString(),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          )),
+        const SizedBox(height: 18),
+        Text('Expiry batches', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (data.expiring.isEmpty)
+          const Text('No batches are nearing expiry.')
+        else
+          ...data.expiring.map((batch) => Card(
+            child: ListTile(
+              leading: const Icon(Icons.event_busy_outlined),
+              title: Text(names[batch.itemId] ?? 'Unknown product'),
+              subtitle: Text(
+                batch.expiryDate == null
+                    ? 'No expiry date'
+                    : 'Expires ' + DateFormat('dd MMM yyyy').format(batch.expiryDate!),
+              ),
+              trailing: Text(batch.quantity.toString() + ' units'),
+            ),
+          )),
+      ],
     );
   }
 
@@ -539,6 +597,7 @@ class _RetailData {
     required this.expenses,
     required this.expiring,
     required this.items,
+    required this.adjustments,
   });
 
   final List<Supplier> suppliers;
@@ -546,6 +605,7 @@ class _RetailData {
   final List<Expense> expenses;
   final List<StockBatch> expiring;
   final List<Item> items;
+  final List<StockAdjustment> adjustments;
 }
 
 class _EmptyState extends StatelessWidget {
