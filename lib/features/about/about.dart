@@ -13,8 +13,9 @@ class AboutPage extends StatelessWidget {
   static const portfolioV2 = 'https://mohammad-sadab-portfolio-v2.vercel.app/';
   static const portfolio = 'https://sadab01.vercel.app/';
   static const github = 'https://github.com/shinuXcode/shop-inventory-app';
-  static const version = '1.2.0';
-  static const buildNumber = '3';
+  static const releases = 'https://github.com/shinuXcode/shop-inventory-app/releases';
+  static const version = '1.3.0';
+  static const buildNumber = '4';
 
   Future<void> _open(BuildContext context, String url) async {
     try {
@@ -78,7 +79,8 @@ class AboutPage extends StatelessWidget {
               _link(context, 'Founder Page', 'Mohammad Sadab — founder and builder', founderUrl, Icons.person_outline),
               _link(context, 'Founder Portfolio V2', portfolioV2, portfolioV2, Icons.web_outlined),
               _link(context, 'Founder Portfolio', portfolio, portfolio, Icons.public_outlined),
-              _link(context, 'GitHub Repository', 'SBILL source code and releases', github, Icons.code_outlined),
+              _link(context, 'GitHub Repository', 'SBILL source code and issues', github, Icons.code_outlined),
+              _link(context, 'Check for updates', 'Open the latest signed SBILL releases', releases, Icons.system_update_outlined),
               _link(context, 'Support Center', 'Create or track a support request', 'https://sbill-showcase.vercel.app/support.html', Icons.support_agent_outlined),
               const SizedBox(height: 18),
               Card(
@@ -87,7 +89,7 @@ class AboutPage extends StatelessWidget {
                     const ListTile(
                       leading: Icon(Icons.info_outline),
                       title: Text('Version'),
-                      subtitle: Text('SBILL 1.2.0 (build 3)'),
+                      subtitle: Text('SBILL 1.3.0 (build 4)'),
                     ),
                     ListTile(
                       leading: Icon(Icons.sync_outlined),

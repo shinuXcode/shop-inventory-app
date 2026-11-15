@@ -196,13 +196,106 @@ class _PurchasesPageState extends ConsumerState<PurchasesPage>
             leading: const Icon(Icons.receipt_long_outlined),
             title: Text(purchase.purchaseNumber),
             subtitle: Text(
-              '${supplier?.name ?? 'Supplier'} • ${DateFormat('dd MMM yyyy').format(purchase.createdAt)} • ${purchase.paymentStatus.toUpperCase()}',
+              '${supplier?.name ?? 'Supplier'} • ${DateFormat('dd MMM yyyy').format(purchase.createdAt)} • ${purchase.paymentStatus.toUpperCase()} • Due: ${_money((purchase.totalMinor - purchase.paidMinor).clamp(0, purchase.totalMinor))}',
             ),
-            trailing: Text(_money(purchase.totalMinor), style: const TextStyle(fontWeight: FontWeight.w700)),
+            trailing: IconButton(
+              tooltip: purchase.totalMinor > purchase.paidMinor ? 'Record supplier payment' : 'Fully paid',
+              onPressed: purchase.totalMinor > purchase.paidMinor
+                  ? () => _recordSupplierPayment(purchase)
+                  : null,
+              icon: Icon(
+                purchase.totalMinor > purchase.paidMinor
+                    ? Icons.add_card_outlined
+                    : Icons.check_circle_outline,
+              ),
+            ),
+            onTap: purchase.totalMinor > purchase.paidMinor
+                ? () => _recordSupplierPayment(purchase)
+                : null,
           ),
         );
       },
     );
+  }
+
+
+  Future<void> _recordSupplierPayment(Purchase purchase) async {
+    final outstanding = (purchase.totalMinor - purchase.paidMinor).clamp(0, purchase.totalMinor);
+    if (outstanding <= 0) return;
+    final amount = TextEditingController();
+    String method = 'cash';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Supplier payment • ${purchase.purchaseNumber}'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Outstanding: ${_money(outstanding)}'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amount,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Amount paid (INR)', prefixText: '₹ '),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: method,
+                  decoration: const InputDecoration(labelText: 'Payment method'),
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
+                    DropdownMenuItem(value: 'bank', child: Text('Bank transfer')),
+                    DropdownMenuItem(value: 'card', child: Text('Card')),
+                    DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
+                  ],
+                  onChanged: (value) => setDialogState(() => method = value ?? 'cash'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Save payment')),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) {
+      amount.dispose();
+      return;
+    }
+    final parsed = double.tryParse(amount.text.trim().replaceAll(',', ''));
+    amount.dispose();
+    if (parsed == null || !parsed.isFinite || parsed <= 0) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid payment amount.')),
+      );
+      return;
+    }
+    try {
+      await ref.read(databaseProvider).recordSupplierPayment(
+        id: const Uuid().v4(),
+        purchaseId: purchase.id,
+        amountMinor: (parsed * 100).round(),
+        paymentMethod: method,
+      );
+      _refresh();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Supplier payment recorded.')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payment could not be recorded: $e')),
+      );
+    }
   }
 
   Widget _expenseList(_RetailData data) {

@@ -1,0 +1,204 @@
+name: SBILL Android Production Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      application_id:
+        description: Existing permanent Android application ID (for example, the ID extracted from the currently installed APK)
+        required: true
+        type: string
+      expected_certificate_sha256:
+        description: Expected production signing certificate SHA-256 fingerprint (colons optional)
+        required: true
+        type: string
+      prerelease:
+        description: Mark this GitHub Release as a prerelease
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sbill-android-production-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ANDROID_APPLICATION_ID: ${{ inputs.application_id }}
+      EXPECTED_CERTIFICATE_SHA256: ${{ inputs.expected_certificate_sha256 }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.6
+          cache: true
+
+      - name: Validate release identity and signing inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ANDROID_APPLICATION_ID" =~ ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$ ]] || {
+            echo "Invalid Android application ID."; exit 1;
+          }
+          [[ "$EXPECTED_CERTIFICATE_SHA256" =~ ^([A-Fa-f0-9]{64}|([A-Fa-f0-9]{2}:){31}[A-Fa-f0-9]{2})$ ]] || {
+            echo "Expected certificate fingerprint must be a  SHA-256 hex digest."; exit 1;
+          }
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          VERSION_SPEC="$(sed -n 's/^version: *//p' pubspec.yaml | head -n 1)"
+          VERSION="${VERSION_SPEC%%+*}"
+          BUILD_NUMBER="${VERSION_SPEC##*+}"
+          [[ "$VERSION_SPEC" == *+* && "$BUILD_NUMBER" =~ ^[0-9]+$ ]] || {
+            echo "pubspec.yaml must use version: x.y.z+build."; exit 1;
+          }
+          RELEASE_TAG="v$VERSION"
+          if git tag --list "$RELEASE_TAG" | grep -q .; then
+            echo "Tag $RELEASE_TAG already exists; release versions are immutable."; exit 1;
+          fi
+          PREVIOUS_TAG="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
+          if [[ -n "$PREVIOUS_TAG" ]]; then
+            PREVIOUS_SPEC="$(git show "$PREVIOUS_TAG:pubspec.yaml" 2>/dev/null | sed -n 's/^version: *//p' | head -n 1 || true)"
+            PREVIOUS_BUILD="${PREVIOUS_SPEC##*+}"
+            if [[ "$PREVIOUS_BUILD" =~ ^[0-9]+$ ]] && (( BUILD_NUMBER <= PREVIOUS_BUILD )); then
+              echo "Build number must increase beyond the last tagged release ($PREVIOUS_BUILD)."
+              exit 1
+            fi
+          fi
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+
+      - name: Generate Android project with the supplied permanent package ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          ORG="${ANDROID_APPLICATION_ID%.*}"
+          PROJECT_NAME="${ANDROID_APPLICATION_ID##*.}"
+          flutter create --org "$ORG" --project-name "$PROJECT_NAME" --platforms=android .
+
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --release \
+            --build-name="$APP_VERSION" \
+            --build-number="$BUILD_NUMBER" \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+
+      - name: Sign and verify production APK
+        id: signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          AAPT="$BUILD_TOOLS/aapt"
+          test -x "$APKSIGNER"
+          test -x "$ZIPALIGN"
+          test -x "$AAPT"
+
+          KEYSTORE_PATH="$RUNNER_TEMP/sbill-production.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+
+          INPUT_APK="build/app/outputs/flutter-apk/app-release.apk"
+          ALIGNED_APK="$RUNNER_TEMP/sbill-aligned.apk"
+          SIGNED_APK="$RUNNER_TEMP/sbill.apk"
+          "$ZIPALIGN" -f -v 4 "$INPUT_APK" "$ALIGNED_APK"
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE_PATH" \
+            --ks-key-alias "$ANDROID_KEY_ALIAS" \
+            --ks-pass "env:ANDROID_KEYSTORE_PASSWORD" \
+            --key-pass "env:ANDROID_KEY_PASSWORD" \
+            --out "$SIGNED_APK" "$ALIGNED_APK"
+          "$APKSIGNER" verify --verbose --print-certs "$SIGNED_APK" | tee "$RUNNER_TEMP/signature.txt"
+
+          ACTUAL_FINGERPRINT="$(sed -n 's/.*certificate SHA-256 digest: *//p' "$RUNNER_TEMP/signature.txt" | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          EXPECTED_FINGERPRINT="$(printf '%s' "$EXPECTED_CERTIFICATE_SHA256" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test -n "$ACTUAL_FINGERPRINT"
+          if [[ "$ACTUAL_FINGERPRINT" != "$EXPECTED_FINGERPRINT" ]]; then
+            echo "Signing certificate does not match the approved fingerprint."
+            exit 1
+          fi
+
+          ACTUAL_APPLICATION_ID="$("$AAPT" dump badging "$SIGNED_APK" | sed -n "s/^package: name='\([^']*\)'.*/\1/p" | head -n 1)"
+          if [[ "$ACTUAL_APPLICATION_ID" != "$ANDROID_APPLICATION_ID" ]]; then
+            echo "APK application ID mismatch: expected $ANDROID_APPLICATION_ID, received $ACTUAL_APPLICATION_ID."
+            exit 1
+          fi
+
+          SHA256="$(sha256sum "$SIGNED_APK" | awk '{print $1}')"
+          cp "$SIGNED_APK" sbill.apk
+          echo "APK_SHA256=$SHA256" >> "$GITHUB_ENV"
+          echo "CERTIFICATE_SHA256=$ACTUAL_FINGERPRINT" >> "$GITHUB_ENV"
+          echo "Verified application ID: $ACTUAL_APPLICATION_ID"
+          echo "Verified signing certificate SHA-256: $ACTUAL_FINGERPRINT"
+
+      - name: Create update metadata
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          data = {
+              "product": "SBILL",
+              "version": os.environ["APP_VERSION"],
+              "versionCode": int(os.environ["BUILD_NUMBER"]),
+              "applicationId": os.environ["ANDROID_APPLICATION_ID"],
+              "minimumSupportedVersion": "1.2.0",
+              "apkUrl": (
+                  "https://github.com/"
+                  + os.environ["GITHUB_REPOSITORY"]
+                  + "/releases/download/"
+                  + os.environ["RELEASE_TAG"]
+                  + "/sbill.apk"
+              ),
+              "sha256": os.environ["APK_SHA256"],
+              "certificateSha256": os.environ["CERTIFICATE_SHA256"],
+              "publishedAt": datetime.now(timezone.utc).isoformat(),
+          }
+          with open("latest.json", "w", encoding="utf-8") as output:
+              json.dump(data, output, indent=2)
+              output.write("\n")
+          PY
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: SBILL ${{ env.APP_VERSION }}
+          generate_release_notes: true
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            sbill.apk
+            latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

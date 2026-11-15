@@ -53,3 +53,18 @@ The product website is under `website/`.
 ## Release status
 
 Do not declare the retail suite production-ready until the new Drift migrations, analyzer, tests, Android/Windows/macOS builds and the two-device Supabase staging scenarios all pass. See `docs/ARCHITECTURE.md`, `docs/RELEASE_CHECKLIST.md`, `docs/HARDWARE_SUPPORT.md` and `docs/SYNC_INTEGRATION_TEST_PLAN.md`.
+
+
+## Accounting, returns and recovery
+
+SBILL keeps money in integer paise and records customer receipts and supplier payments as individual ledger entries. Invoice and purchase balances are updated in the same SQLite transaction as their payment record; overpayments are rejected. Sales returns are tied to original invoice lines, limited to the unreturned quantity, and can restore returned quantities to stock in the same SQLite transaction. Returned stock is reintroduced as a new non-expiry batch unless expiry is managed separately.
+
+JSON backups include customer receipts, supplier payments, sales return headers and return lines. Backup validation checks the new parent references before any rows are written. Drift schema version 6 adds these ledgers and invoice payment state without dropping earlier data.
+
+The updated `supabase/schema.sql` adds business-scoped tables and row-level security policies for suppliers, purchases, expenses, stock adjustments, expiry batches, payment ledgers and sales returns. Run the complete SQL file in the Supabase SQL editor before enabling these sync entities in an existing cloud workspace. Local SQLite remains the source of truth; test the migration in a staging project before production use.
+
+## Android release safety
+
+The Android production release workflow is manual and fail-closed. It requires the intended full application ID, an existing keystore and passwords supplied as GitHub Actions secrets, plus the expected signing-certificate SHA-256 fingerprint. It signs the APK, verifies the signature and package ID, generates `latest.json` with the APK checksum and publishes the APK and metadata as a GitHub Release.
+
+The repository does not hard-code an application ID or generate a production signing key. Use the identity and keystore from an existing production installation if one exists. A default CI APK is not evidence of update compatibility. See `docs/IMPLEMENTATION_STATUS.md`.

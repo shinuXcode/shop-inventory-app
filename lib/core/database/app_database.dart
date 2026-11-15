@@ -55,6 +55,8 @@ class Invoices extends Table {
   IntColumn get igstMinor => integer().withDefault(const Constant(0))();
   TextColumn get gstSupplyType => text().withDefault(const Constant('intraState'))();
   IntColumn get totalMinor => integer()();
+  IntColumn get paidMinor => integer().withDefault(const Constant(0))();
+  TextColumn get paymentStatus => text().withDefault(const Constant('paid'))();
   TextColumn get paymentMethod => text()();
   TextColumn get status => text().withDefault(const Constant('completed'))();
   TextColumn get notes => text().nullable()();
@@ -165,6 +167,59 @@ class StockBatches extends Table {
   @override Set<Column<Object>> get primaryKey => {id};
 }
 
+
+class CustomerPayments extends Table {
+  TextColumn get id => text()();
+  TextColumn get customerId => text()();
+  TextColumn get invoiceId => text().nullable()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get paymentMethod => text()();
+  TextColumn get reference => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get receivedAt => dateTime()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
+class SupplierPayments extends Table {
+  TextColumn get id => text()();
+  TextColumn get supplierId => text()();
+  TextColumn get purchaseId => text().nullable()();
+  IntColumn get amountMinor => integer()();
+  TextColumn get paymentMethod => text()();
+  TextColumn get reference => text().nullable()();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get paidAt => dateTime()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
+class SalesReturns extends Table {
+  TextColumn get id => text()();
+  TextColumn get returnNumber => text()();
+  TextColumn get invoiceId => text()();
+  TextColumn get customerId => text().nullable()();
+  IntColumn get subtotalMinor => integer()();
+  IntColumn get taxMinor => integer()();
+  IntColumn get totalMinor => integer()();
+  TextColumn get refundMethod => text()();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
+class SalesReturnItems extends Table {
+  TextColumn get id => text()();
+  TextColumn get returnId => text()();
+  TextColumn get invoiceItemId => text()();
+  TextColumn get itemId => text()();
+  TextColumn get itemNameSnapshot => text()();
+  IntColumn get quantity => integer()();
+  IntColumn get unitPriceMinor => integer()();
+  RealColumn get taxRate => real()();
+  IntColumn get taxMinor => integer()();
+  IntColumn get lineTotalMinor => integer()();
+  @override Set<Column<Object>> get primaryKey => {id};
+}
+
 class TopSellingItem {
   const TopSellingItem({
     required this.name,
@@ -177,11 +232,11 @@ class TopSellingItem {
   final int totalMinor;
 }
 
-@DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments, StockBatches])
+@DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments, StockBatches, CustomerPayments, SupplierPayments, SalesReturns, SalesReturnItems])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
-  @override int get schemaVersion => 5;
+  @override int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -212,6 +267,18 @@ class AppDatabase extends _$AppDatabase {
           if (from < 5) {
             await m.addColumn(items, items.hsnSac);
             await m.addColumn(invoiceItems, invoiceItems.hsnSacSnapshot);
+          }
+          if (from < 6) {
+            await m.addColumn(invoices, invoices.paidMinor);
+            await m.addColumn(invoices, invoices.paymentStatus);
+            await customStatement(
+              "UPDATE invoices SET paid_minor = CASE WHEN LOWER(payment_method) = 'credit' THEN 0 ELSE total_minor END, "
+              "payment_status = CASE WHEN LOWER(payment_method) = 'credit' THEN 'unpaid' ELSE 'paid' END",
+            );
+            await m.createTable(customerPayments);
+            await m.createTable(supplierPayments);
+            await m.createTable(salesReturns);
+            await m.createTable(salesReturnItems);
           }
         },
         beforeOpen: (details) async {
@@ -285,13 +352,14 @@ class AppDatabase extends _$AppDatabase {
 
   Future<int> creditOutstandingMinor() async {
     final row = await customSelect(
-      'SELECT COALESCE(SUM(total_minor), 0) AS amount '
-      'FROM invoices WHERE payment_method = ? AND status != ?',
+      'SELECT COALESCE(SUM(MAX(i.total_minor - '
+      'CASE WHEN i.payment_status = \'paid\' AND i.paid_minor = 0 THEN i.total_minor ELSE i.paid_minor END - '
+      'COALESCE((SELECT SUM(r.total_minor) FROM sales_returns r WHERE r.invoice_id = i.id), 0), 0)), 0) AS amount '
+      'FROM invoices i WHERE i.status != ?',
       variables: [
-        const Variable<String>('credit'),
         const Variable<String>('cancelled'),
       ],
-      readsFrom: {invoices},
+      readsFrom: {invoices, salesReturns},
     ).getSingle();
     return row.read<int>('amount');
   }
@@ -342,6 +410,304 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> saveSupplier(SuppliersCompanion supplier) async {
     await into(suppliers).insertOnConflictUpdate(supplier);
+    await into(syncQueue).insert(SyncQueueCompanion.insert(
+      entityType: 'supplier',
+      entityId: supplier.id.value,
+      operation: 'upsert',
+      createdAt: DateTime.now(),
+    ));
+  }
+
+  Future<List<CustomerPayment>> customerPaymentsFor(String customerId) =>
+      (select(customerPayments)
+            ..where((t) => t.customerId.equals(customerId))
+            ..orderBy([(t) => OrderingTerm.desc(t.receivedAt)]))
+          .get();
+
+  Future<List<SupplierPayment>> supplierPaymentsFor(String supplierId) =>
+      (select(supplierPayments)
+            ..where((t) => t.supplierId.equals(supplierId))
+            ..orderBy([(t) => OrderingTerm.desc(t.paidAt)]))
+          .get();
+
+  Future<List<SalesReturn>> salesReturnsForInvoice(String invoiceId) =>
+      (select(salesReturns)
+            ..where((t) => t.invoiceId.equals(invoiceId))
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
+
+  Future<int> recordCustomerPayment({
+    required String id,
+    required String invoiceId,
+    required int amountMinor,
+    required String paymentMethod,
+    String? reference,
+    String? notes,
+  }) async {
+    if (amountMinor <= 0) {
+      throw ArgumentError('Payment amount must be greater than zero.');
+    }
+    final method = paymentMethod.trim().toLowerCase();
+    if (method.isEmpty || method == 'credit') {
+      throw ArgumentError('Choose a valid receipt method.');
+    }
+    return transaction(() async {
+      final invoice = await invoiceById(invoiceId);
+      if (invoice == null || invoice.customerId == null) {
+        throw StateError('The invoice does not belong to a saved customer.');
+      }
+      if (invoice.status == 'cancelled' || invoice.status == 'returned') {
+        throw StateError('Payments cannot be recorded against a cancelled or returned invoice.');
+      }
+      final existingReturns = await (select(salesReturns)
+            ..where((t) => t.invoiceId.equals(invoiceId)))
+          .get();
+      final returnedMinor = existingReturns.fold<int>(0, (sum, value) => sum + value.totalMinor);
+      final outstanding = invoice.totalMinor - invoice.paidMinor - returnedMinor;
+      if (amountMinor > outstanding) {
+        throw ArgumentError('Receipt exceeds the remaining invoice balance.');
+      }
+      final now = DateTime.now();
+      await into(customerPayments).insert(CustomerPaymentsCompanion.insert(
+        id: id,
+        customerId: invoice.customerId!,
+        invoiceId: Value(invoiceId),
+        amountMinor: amountMinor,
+        paymentMethod: method,
+        reference: Value(_nullable(reference)),
+        notes: Value(_nullable(notes)),
+        receivedAt: now,
+      ));
+      final paid = invoice.paidMinor + amountMinor;
+      await (update(invoices)..where((t) => t.id.equals(invoiceId))).write(
+        InvoicesCompanion(
+          paidMinor: Value(paid),
+          paymentStatus: Value(
+            paid + returnedMinor >= invoice.totalMinor
+                ? 'paid'
+                : paid > 0 || returnedMinor > 0
+                    ? 'partial'
+                    : 'unpaid',
+          ),
+          updatedAt: Value(now),
+          syncStatus: const Value('pending'),
+        ),
+      );
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'customerPayment',
+        entityId: id,
+        operation: 'upsert',
+        createdAt: now,
+      ));
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'invoice',
+        entityId: invoiceId,
+        operation: 'upsert',
+        createdAt: now,
+      ));
+      return outstanding - amountMinor;
+    });
+  }
+
+  Future<int> recordSupplierPayment({
+    required String id,
+    required String purchaseId,
+    required int amountMinor,
+    required String paymentMethod,
+    String? reference,
+    String? notes,
+  }) async {
+    if (amountMinor <= 0) {
+      throw ArgumentError('Payment amount must be greater than zero.');
+    }
+    final method = paymentMethod.trim().toLowerCase();
+    if (method.isEmpty) throw ArgumentError('Choose a valid payment method.');
+    return transaction(() async {
+      final purchase = await (select(purchases)
+            ..where((t) => t.id.equals(purchaseId)))
+          .getSingleOrNull();
+      if (purchase == null || purchase.paymentStatus == 'cancelled') {
+        throw StateError('The purchase is unavailable for payment.');
+      }
+      final outstanding = purchase.totalMinor - purchase.paidMinor;
+      if (amountMinor > outstanding) {
+        throw ArgumentError('Payment exceeds the remaining supplier balance.');
+      }
+      final supplier = await (select(suppliers)
+            ..where((t) => t.id.equals(purchase.supplierId)))
+          .getSingleOrNull();
+      if (supplier == null) throw StateError('The supplier record is missing.');
+      final now = DateTime.now();
+      await into(supplierPayments).insert(SupplierPaymentsCompanion.insert(
+        id: id,
+        supplierId: purchase.supplierId,
+        purchaseId: Value(purchaseId),
+        amountMinor: amountMinor,
+        paymentMethod: method,
+        reference: Value(_nullable(reference)),
+        notes: Value(_nullable(notes)),
+        paidAt: now,
+      ));
+      final paid = purchase.paidMinor + amountMinor;
+      final status = paid >= purchase.totalMinor ? 'paid' : 'partial';
+      await (update(purchases)..where((t) => t.id.equals(purchaseId))).write(
+        PurchasesCompanion(
+          paidMinor: Value(paid),
+          paymentStatus: Value(status),
+        ),
+      );
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'supplierPayment',
+        entityId: id,
+        operation: 'upsert',
+        createdAt: now,
+      ));
+      return outstanding - amountMinor;
+    });
+  }
+
+  Future<String> recordSalesReturn({
+    required String id,
+    required String returnNumber,
+    required String invoiceId,
+    required List<SalesReturnLine> lines,
+    required String refundMethod,
+    String? notes,
+    bool restock = true,
+  }) async {
+    if (lines.isEmpty) throw ArgumentError('Select at least one item to return.');
+    final method = refundMethod.trim().toLowerCase();
+    if (method.isEmpty) throw ArgumentError('Refund method is required.');
+    final requested = <String, int>{};
+    for (final line in lines) {
+      if (line.quantity <= 0) throw ArgumentError('Return quantities must be positive.');
+      requested.update(
+        line.invoiceItemId,
+        (value) => value + line.quantity,
+        ifAbsent: () => line.quantity,
+      );
+    }
+    return transaction(() async {
+      final invoice = await invoiceById(invoiceId);
+      if (invoice == null || invoice.status == 'cancelled') {
+        throw StateError('The original invoice is unavailable for return.');
+      }
+      var subtotalMinor = 0;
+      var taxMinor = 0;
+      final now = DateTime.now();
+      final returnItems = <SalesReturnItemsCompanion>[];
+      for (final entry in requested.entries) {
+        final original = await (select(invoiceItems)
+              ..where((t) => t.id.equals(entry.key) & t.invoiceId.equals(invoiceId)))
+            .getSingleOrNull();
+        if (original == null) {
+          throw StateError('A selected item does not belong to this invoice.');
+        }
+        final priorReturns = await (select(salesReturnItems)
+              ..where((t) => t.invoiceItemId.equals(original.id)))
+            .get();
+        final previouslyReturnedQty = priorReturns.fold<int>(0, (sum, row) => sum + row.quantity);
+        final previouslyReturnedTotal = priorReturns.fold<int>(0, (sum, row) => sum + row.lineTotalMinor);
+        final previouslyReturnedTax = priorReturns.fold<int>(0, (sum, row) => sum + row.taxMinor);
+        final remainingQty = original.quantity - previouslyReturnedQty;
+        if (entry.value > remainingQty || remainingQty <= 0) {
+          throw ArgumentError('Return quantity exceeds the quantity remaining on the original invoice.');
+        }
+        final remainingTotal = original.lineTotalMinor - previouslyReturnedTotal;
+        final remainingTax = original.taxMinor - previouslyReturnedTax;
+        final returnedTotal = entry.value == remainingQty
+            ? remainingTotal
+            : (remainingTotal * entry.value + remainingQty ~/ 2) ~/ remainingQty;
+        final returnedTax = entry.value == remainingQty
+            ? remainingTax
+            : (remainingTax * entry.value + remainingQty ~/ 2) ~/ remainingQty;
+        final item = await (select(items)..where((t) => t.id.equals(original.itemId))).getSingleOrNull();
+        if (restock && item == null) {
+          throw StateError('The original product no longer exists; disable restocking to record this return.');
+        }
+        if (restock) {
+          await (update(items)..where((t) => t.id.equals(original.itemId))).write(
+            ItemsCompanion(
+              stockQuantity: Value(item!.stockQuantity + entry.value),
+              updatedAt: Value(now),
+              syncStatus: const Value('pending'),
+            ),
+          );
+          final returnBatchId = const Uuid().v4();
+          await into(stockBatches).insert(StockBatchesCompanion.insert(
+            id: returnBatchId,
+            itemId: original.itemId,
+            quantity: entry.value,
+            createdAt: now,
+          ));
+          await into(syncQueue).insert(SyncQueueCompanion.insert(
+            entityType: 'stockBatch',
+            entityId: returnBatchId,
+            operation: 'upsert',
+            createdAt: now,
+          ));
+          await into(syncQueue).insert(SyncQueueCompanion.insert(
+            entityType: 'item',
+            entityId: original.itemId,
+            operation: 'upsert',
+            createdAt: now,
+          ));
+        }
+        final lineSubtotal = returnedTotal - returnedTax;
+        subtotalMinor += lineSubtotal;
+        taxMinor += returnedTax;
+        returnItems.add(SalesReturnItemsCompanion.insert(
+          id: const Uuid().v4(),
+          returnId: id,
+          invoiceItemId: original.id,
+          itemId: original.itemId,
+          itemNameSnapshot: original.itemNameSnapshot,
+          quantity: entry.value,
+          unitPriceMinor: original.unitPriceMinor,
+          taxRate: original.taxRate,
+          taxMinor: returnedTax,
+          lineTotalMinor: returnedTotal,
+        ));
+      }
+      await into(salesReturns).insert(SalesReturnsCompanion.insert(
+        id: id,
+        returnNumber: returnNumber,
+        invoiceId: invoiceId,
+        customerId: Value(invoice.customerId),
+        subtotalMinor: subtotalMinor,
+        taxMinor: taxMinor,
+        totalMinor: subtotalMinor + taxMinor,
+        refundMethod: method,
+        notes: Value(_nullable(notes)),
+        createdAt: now,
+      ));
+      for (final line in returnItems) {
+        await into(salesReturnItems).insert(line);
+      }
+      final allReturns = await (select(salesReturns)
+            ..where((t) => t.invoiceId.equals(invoiceId)))
+          .get();
+      final totalReturned = allReturns.fold<int>(0, (sum, row) => sum + row.totalMinor);
+      final paidAndReturned = invoice.paidMinor + totalReturned;
+      await (update(invoices)..where((t) => t.id.equals(invoiceId))).write(
+        InvoicesCompanion(
+          paymentStatus: Value(
+            paidAndReturned >= invoice.totalMinor
+                ? 'paid'
+                : paidAndReturned > 0
+                    ? 'partial'
+                    : 'unpaid',
+          ),
+        ),
+      );
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'salesReturn',
+        entityId: id,
+        operation: 'upsert',
+        createdAt: now,
+      ));
+      return id;
+    });
   }
 
   Future<List<Supplier>> getSuppliers({String query = ''}) {
@@ -381,6 +747,7 @@ class AppDatabase extends _$AppDatabase {
     required List<PurchaseLine> lines,
     required int discountMinor,
     required int paidMinor,
+    String paymentMethod = 'cash',
     String? notes,
   }) async {
     if (lines.isEmpty) {
@@ -460,6 +827,29 @@ class AppDatabase extends _$AppDatabase {
         notes: Value(notes),
         createdAt: now,
       ));
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'purchase',
+        entityId: purchaseId,
+        operation: 'upsert',
+        createdAt: now,
+      ));
+      if (paidMinor > 0) {
+        final openingPaymentId = const Uuid().v4();
+        await into(supplierPayments).insert(SupplierPaymentsCompanion.insert(
+          id: openingPaymentId,
+          supplierId: supplierId,
+          purchaseId: Value(purchaseId),
+          amountMinor: paidMinor,
+          paymentMethod: paymentMethod.trim().isEmpty ? 'cash' : paymentMethod.trim().toLowerCase(),
+          paidAt: now,
+        ));
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'supplierPayment',
+          entityId: openingPaymentId,
+          operation: 'upsert',
+          createdAt: now,
+        ));
+      }
 
       var remainingDiscount = discountMinor;
       var remainingSubtotal = totals.subtotalMinor;
@@ -550,6 +940,12 @@ class AppDatabase extends _$AppDatabase {
       paymentMethod: Value(paymentMethod.trim().toLowerCase()),
       incurredAt: incurredAt,
     ));
+    await into(syncQueue).insert(SyncQueueCompanion.insert(
+      entityType: 'expense',
+      entityId: id,
+      operation: 'upsert',
+      createdAt: DateTime.now(),
+    ));
   }
 
   Future<void> _consumeStockBatches(String itemId, int quantity) async {
@@ -571,6 +967,12 @@ class AppDatabase extends _$AppDatabase {
       await (update(stockBatches)..where((t) => t.id.equals(batch.id))).write(
         StockBatchesCompanion(quantity: Value(batch.quantity - consumed)),
       );
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'stockBatch',
+        entityId: batch.id,
+        operation: 'upsert',
+        createdAt: DateTime.now(),
+      ));
       remaining -= consumed;
     }
     // Any remaining units are legacy/opening stock that has no batch record.
@@ -610,10 +1012,17 @@ class AppDatabase extends _$AppDatabase {
       if (quantityDelta < 0) {
         await _consumeStockBatches(itemId, -quantityDelta);
       } else {
+        final batchId = const Uuid().v4();
         await into(stockBatches).insert(StockBatchesCompanion.insert(
-          id: const Uuid().v4(),
+          id: batchId,
           itemId: itemId,
           quantity: quantityDelta,
+          createdAt: now,
+        ));
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'stockBatch',
+          entityId: batchId,
+          operation: 'upsert',
           createdAt: now,
         ));
       }
@@ -622,6 +1031,12 @@ class AppDatabase extends _$AppDatabase {
         itemId: itemId,
         quantityDelta: quantityDelta,
         reason: reason.trim(),
+        createdAt: now,
+      ));
+      await into(syncQueue).insert(SyncQueueCompanion.insert(
+        entityType: 'stockAdjustment',
+        entityId: id,
+        operation: 'upsert',
         createdAt: now,
       ));
       await into(syncQueue).insert(SyncQueueCompanion.insert(
@@ -778,6 +1193,10 @@ class AppDatabase extends _$AppDatabase {
         totalMinor: gstTotals.totalMinor,
       );
 
+      if (customerId != null) {
+        final customer = await customerById(customerId);
+        if (customer == null) throw StateError('The selected customer no longer exists.');
+      }
       await into(invoices).insert(InvoicesCompanion.insert(
         id: invoiceId,
         invoiceNumber: invoiceNumber,
@@ -790,6 +1209,8 @@ class AppDatabase extends _$AppDatabase {
         igstMinor: Value(gstTotals.igstMinor),
         gstSupplyType: Value(gstSupplyType.name),
         totalMinor: totals.totalMinor,
+        paidMinor: Value(paymentMethod.trim().toLowerCase() == 'credit' ? 0 : totals.totalMinor),
+        paymentStatus: Value(paymentMethod.trim().toLowerCase() == 'credit' ? 'unpaid' : 'paid'),
         paymentMethod: paymentMethod.trim().toLowerCase(),
         createdAt: now,
         updatedAt: now,
@@ -837,6 +1258,17 @@ class AppDatabase extends _$AppDatabase {
           igstMinor: Value(gstLine.igstMinor),
           taxMinor: lineTax,
           lineTotalMinor: lineSubtotal - lineDiscount + lineTax,
+        ));
+      }
+
+      if (customerId != null && paymentMethod.trim().toLowerCase() != 'credit') {
+        await into(customerPayments).insert(CustomerPaymentsCompanion.insert(
+          id: const Uuid().v4(),
+          customerId: customerId,
+          invoiceId: Value(invoiceId),
+          amountMinor: totals.totalMinor,
+          paymentMethod: paymentMethod.trim().toLowerCase(),
+          receivedAt: now,
         ));
       }
 
@@ -906,7 +1338,19 @@ class AppDatabase extends _$AppDatabase {
     var creditMinor = 0;
     for (final row in rows) {
       totalMinor += row.totalMinor;
-      if (row.paymentMethod == 'credit') creditMinor += row.totalMinor;
+      final returned = await (select(salesReturns)
+            ..where((t) => t.invoiceId.equals(row.id)))
+          .get();
+      final returnedMinor = returned.fold<int>(0, (sum, value) => sum + value.totalMinor);
+      final effectivePaid = row.paymentStatus == 'paid' &&
+              row.paidMinor == 0 &&
+              row.paymentMethod.toLowerCase() != 'credit'
+          ? row.totalMinor
+          : row.paidMinor;
+      final outstanding = row.totalMinor - effectivePaid - returnedMinor;
+      if (row.status != 'cancelled' && outstanding > 0) {
+        creditMinor += outstanding;
+      }
     }
     return CustomerStats(
       invoiceCount: rows.length,
@@ -926,6 +1370,10 @@ class AppDatabase extends _$AppDatabase {
     final expenseRows = await select(expenses).get();
     final adjustmentRows = await select(stockAdjustments).get();
     final batchRows = await select(stockBatches).get();
+    final customerPaymentRows = await select(customerPayments).get();
+    final supplierPaymentRows = await select(supplierPayments).get();
+    final returnRows = await select(salesReturns).get();
+    final returnItemRows = await select(salesReturnItems).get();
     return {
       'format': 'sbill-backup-v1',
       'exportedAt': DateTime.now().toIso8601String(),
@@ -944,6 +1392,7 @@ class AppDatabase extends _$AppDatabase {
       'invoices': invoiceRows.map((x) => {
         'id': x.id, 'invoiceNumber': x.invoiceNumber, 'customerId': x.customerId,
         'subtotalMinor': x.subtotalMinor, 'discountMinor': x.discountMinor,
+        'paidMinor': x.paidMinor, 'paymentStatus': x.paymentStatus,
         'taxMinor': x.taxMinor, 'cgstMinor': x.cgstMinor, 'sgstMinor': x.sgstMinor,
         'igstMinor': x.igstMinor, 'gstSupplyType': x.gstSupplyType,
         'totalMinor': x.totalMinor, 'paymentMethod': x.paymentMethod,
@@ -989,6 +1438,32 @@ class AppDatabase extends _$AppDatabase {
         'id': x.id, 'itemId': x.itemId, 'purchaseItemId': x.purchaseItemId,
         'quantity': x.quantity, 'expiryDate': x.expiryDate?.toIso8601String(),
         'createdAt': x.createdAt.toIso8601String(),
+      }).toList(),
+      'customerPayments': customerPaymentRows.map((x) => {
+        'id': x.id, 'customerId': x.customerId, 'invoiceId': x.invoiceId,
+        'amountMinor': x.amountMinor, 'paymentMethod': x.paymentMethod,
+        'reference': x.reference, 'notes': x.notes,
+        'receivedAt': x.receivedAt.toIso8601String(),
+      }).toList(),
+      'supplierPayments': supplierPaymentRows.map((x) => {
+        'id': x.id, 'supplierId': x.supplierId, 'purchaseId': x.purchaseId,
+        'amountMinor': x.amountMinor, 'paymentMethod': x.paymentMethod,
+        'reference': x.reference, 'notes': x.notes,
+        'paidAt': x.paidAt.toIso8601String(),
+      }).toList(),
+      'salesReturns': returnRows.map((x) => {
+        'id': x.id, 'returnNumber': x.returnNumber, 'invoiceId': x.invoiceId,
+        'customerId': x.customerId, 'subtotalMinor': x.subtotalMinor,
+        'taxMinor': x.taxMinor, 'totalMinor': x.totalMinor,
+        'refundMethod': x.refundMethod, 'notes': x.notes,
+        'createdAt': x.createdAt.toIso8601String(),
+      }).toList(),
+      'salesReturnItems': returnItemRows.map((x) => {
+        'id': x.id, 'returnId': x.returnId, 'invoiceItemId': x.invoiceItemId,
+        'itemId': x.itemId, 'itemNameSnapshot': x.itemNameSnapshot,
+        'quantity': x.quantity, 'unitPriceMinor': x.unitPriceMinor,
+        'taxRate': x.taxRate, 'taxMinor': x.taxMinor,
+        'lineTotalMinor': x.lineTotalMinor,
       }).toList(),
     };
   }
@@ -1138,6 +1613,10 @@ class AppDatabase extends _$AppDatabase {
       'expenses',
       'stockAdjustments',
       'stockBatches',
+      'customerPayments',
+      'supplierPayments',
+      'salesReturns',
+      'salesReturnItems',
     ];
     final collections = <String, List<Map>>{};
 
@@ -1175,6 +1654,10 @@ class AppDatabase extends _$AppDatabase {
       'expenses': ['id', 'category'],
       'stockAdjustments': ['id', 'itemId', 'reason'],
       'stockBatches': ['id', 'itemId'],
+      'customerPayments': ['id', 'customerId', 'amountMinor', 'paymentMethod'],
+      'supplierPayments': ['id', 'supplierId', 'amountMinor', 'paymentMethod'],
+      'salesReturns': ['id', 'returnNumber', 'invoiceId', 'refundMethod'],
+      'salesReturnItems': ['id', 'returnId', 'invoiceItemId', 'itemId', 'itemNameSnapshot'],
     };
     final idsByCollection = <String, Set<String>>{};
 
@@ -1188,6 +1671,17 @@ class AppDatabase extends _$AppDatabase {
         for (final field in requiredFields[key] ?? const <String>[]) {
           if ((row[field]?.toString().trim() ?? '').isEmpty) {
             errors.add('Backup $key row $rowNumber: required field "$field" is missing.');
+          }
+        }
+        for (final amountField in const [
+          'amountMinor', 'totalMinor', 'subtotalMinor', 'taxMinor',
+          'paidMinor', 'unitPriceMinor', 'unitCostMinor', 'lineTotalMinor',
+        ]) {
+          final raw = row[amountField];
+          if (raw == null) continue;
+          final amount = int.tryParse(raw.toString());
+          if (amount == null || amount < 0) {
+            errors.add('Backup $key row $rowNumber: "$amountField" must be a non-negative integer.');
           }
         }
         final id = row['id']?.toString().trim() ?? '';
@@ -1218,8 +1712,16 @@ class AppDatabase extends _$AppDatabase {
     }
 
     validateReference('invoiceItems', 'invoiceId', 'invoices');
+    validateReference('invoices', 'customerId', 'customers');
     validateReference('purchases', 'supplierId', 'suppliers');
     validateReference('purchaseItems', 'purchaseId', 'purchases');
+    validateReference('customerPayments', 'customerId', 'customers');
+    validateReference('customerPayments', 'invoiceId', 'invoices');
+    validateReference('supplierPayments', 'supplierId', 'suppliers');
+    validateReference('supplierPayments', 'purchaseId', 'purchases');
+    validateReference('salesReturns', 'invoiceId', 'invoices');
+    validateReference('salesReturnItems', 'returnId', 'salesReturns');
+    validateReference('salesReturnItems', 'invoiceItemId', 'invoiceItems');
 
     return errors;
   }
@@ -1242,6 +1744,10 @@ class AppDatabase extends _$AppDatabase {
     final expenseRows = (snapshot['expenses'] as List?)?.whereType<Map>().toList() ?? const [];
     final adjustmentRows = (snapshot['stockAdjustments'] as List?)?.whereType<Map>().toList() ?? const [];
     final batchRows = (snapshot['stockBatches'] as List?)?.whereType<Map>().toList() ?? const [];
+    final customerPaymentRows = (snapshot['customerPayments'] as List?)?.whereType<Map>().toList() ?? const [];
+    final supplierPaymentRows = (snapshot['supplierPayments'] as List?)?.whereType<Map>().toList() ?? const [];
+    final returnRows = (snapshot['salesReturns'] as List?)?.whereType<Map>().toList() ?? const [];
+    final returnItemRows = (snapshot['salesReturnItems'] as List?)?.whereType<Map>().toList() ?? const [];
 
     var imported = 0;
     final importedItemIds = <String>[];
@@ -1262,6 +1768,11 @@ class AppDatabase extends _$AppDatabase {
       final existingExpenseIds = (await select(expenses).get()).map((row) => row.id).toSet();
       final existingAdjustmentIds = (await select(stockAdjustments).get()).map((row) => row.id).toSet();
       final existingBatchIds = (await select(stockBatches).get()).map((row) => row.id).toSet();
+      final existingCustomerPaymentIds = (await select(customerPayments).get()).map((row) => row.id).toSet();
+      final existingSupplierPaymentIds = (await select(supplierPayments).get()).map((row) => row.id).toSet();
+      final existingReturnIds = (await select(salesReturns).get()).map((row) => row.id).toSet();
+      final existingReturnItemIds = (await select(salesReturnItems).get()).map((row) => row.id).toSet();
+      final importedReturnIds = <String>[];
 
       for (final row in itemRows) {
         final id = row['id'].toString();
@@ -1322,6 +1833,19 @@ class AppDatabase extends _$AppDatabase {
           igstMinor: Value(_number(row['igstMinor'])),
           gstSupplyType: Value(row['gstSupplyType']?.toString() ?? 'unknown'),
           totalMinor: Value(_number(row['totalMinor'])),
+          paidMinor: Value(
+            row.containsKey('paidMinor')
+                ? _number(row['paidMinor'])
+                : row['paymentMethod']?.toString().toLowerCase() == 'credit'
+                    ? 0
+                    : _number(row['totalMinor']),
+          ),
+          paymentStatus: Value(
+            row['paymentStatus']?.toString() ??
+                (row['paymentMethod']?.toString().toLowerCase() == 'credit'
+                    ? 'unpaid'
+                    : 'paid'),
+          ),
           paymentMethod: Value(row['paymentMethod'].toString()),
           status: Value(row['status']?.toString() ?? 'completed'),
           notes: Value(_nullable(row['notes'])),
@@ -1456,6 +1980,143 @@ class AppDatabase extends _$AppDatabase {
         imported++;
       }
 
+      for (final row in customerPaymentRows) {
+        final id = row['id'].toString();
+        final customerId = row['customerId'].toString();
+        final invoiceId = _nullable(row['invoiceId']);
+        if (existingCustomerPaymentIds.contains(id)) continue;
+        if (!(existingCustomerIds.contains(customerId) || importedCustomerIds.contains(customerId))) continue;
+        if (invoiceId != null && !(existingInvoiceIds.contains(invoiceId) || importedInvoiceIds.contains(invoiceId))) continue;
+        await into(customerPayments).insert(CustomerPaymentsCompanion.insert(
+          id: id,
+          customerId: customerId,
+          invoiceId: Value(invoiceId),
+          amountMinor: _number(row['amountMinor']),
+          paymentMethod: row['paymentMethod'].toString(),
+          reference: Value(_nullable(row['reference'])),
+          notes: Value(_nullable(row['notes'])),
+          receivedAt: _rowDate(row['receivedAt']) ?? now,
+        ));
+        if (invoiceId != null && existingInvoiceIds.contains(invoiceId) &&
+            !importedInvoiceIds.contains(invoiceId)) {
+          final invoice = await invoiceById(invoiceId);
+          if (invoice != null) {
+            final receipts = await (select(customerPayments)
+                  ..where((payment) => payment.invoiceId.equals(invoiceId)))
+                .get();
+            final ledgerPaid = receipts.fold<int>(0, (sum, payment) => sum + payment.amountMinor);
+            final paid = ledgerPaid.clamp(invoice.paidMinor, invoice.totalMinor).toInt();
+            await (update(invoices)..where((t) => t.id.equals(invoiceId))).write(
+              InvoicesCompanion(
+                paidMinor: Value(paid),
+                paymentStatus: Value(paid >= invoice.totalMinor ? 'paid' : paid > 0 ? 'partial' : 'unpaid'),
+              ),
+            );
+          }
+        }
+        imported++;
+      }
+      for (final row in supplierPaymentRows) {
+        final id = row['id'].toString();
+        final supplierId = row['supplierId'].toString();
+        final purchaseId = _nullable(row['purchaseId']);
+        if (existingSupplierPaymentIds.contains(id)) continue;
+        if (!(existingSupplierIds.contains(supplierId) || importedSupplierIds.contains(supplierId))) continue;
+        if (purchaseId != null && !(existingPurchaseIds.contains(purchaseId) || importedPurchaseIds.contains(purchaseId))) continue;
+        await into(supplierPayments).insert(SupplierPaymentsCompanion.insert(
+          id: id,
+          supplierId: supplierId,
+          purchaseId: Value(purchaseId),
+          amountMinor: _number(row['amountMinor']),
+          paymentMethod: row['paymentMethod'].toString(),
+          reference: Value(_nullable(row['reference'])),
+          notes: Value(_nullable(row['notes'])),
+          paidAt: _rowDate(row['paidAt']) ?? now,
+        ));
+        if (purchaseId != null && existingPurchaseIds.contains(purchaseId) &&
+            !importedPurchaseIds.contains(purchaseId)) {
+          final purchase = await (select(purchases)
+                ..where((t) => t.id.equals(purchaseId)))
+              .getSingleOrNull();
+          if (purchase != null) {
+            final payments = await (select(supplierPayments)
+                  ..where((payment) => payment.purchaseId.equals(purchaseId)))
+                .get();
+            final ledgerPaid = payments.fold<int>(0, (sum, payment) => sum + payment.amountMinor);
+            final paid = ledgerPaid.clamp(purchase.paidMinor, purchase.totalMinor).toInt();
+            await (update(purchases)..where((t) => t.id.equals(purchaseId))).write(
+              PurchasesCompanion(
+                paidMinor: Value(paid),
+                paymentStatus: Value(paid >= purchase.totalMinor ? 'paid' : paid > 0 ? 'partial' : 'unpaid'),
+              ),
+            );
+          }
+        }
+        imported++;
+      }
+      for (final row in returnRows) {
+        final id = row['id'].toString();
+        final invoiceId = row['invoiceId'].toString();
+        if (existingReturnIds.contains(id)) continue;
+        if (!(existingInvoiceIds.contains(invoiceId) || importedInvoiceIds.contains(invoiceId))) continue;
+        await into(salesReturns).insert(SalesReturnsCompanion.insert(
+          id: id,
+          returnNumber: row['returnNumber'].toString(),
+          invoiceId: invoiceId,
+          customerId: Value(_nullable(row['customerId'])),
+          subtotalMinor: _number(row['subtotalMinor']),
+          taxMinor: _number(row['taxMinor']),
+          totalMinor: _number(row['totalMinor']),
+          refundMethod: row['refundMethod'].toString(),
+          notes: Value(_nullable(row['notes'])),
+          createdAt: _rowDate(row['createdAt']) ?? now,
+        ));
+        importedReturnIds.add(id);
+        imported++;
+      }
+      for (final invoiceId in {
+        ...returnRows.map((row) => row['invoiceId'].toString()),
+        ...customerPaymentRows.map((row) => _nullable(row['invoiceId'])).whereType<String>(),
+      }) {
+        final invoice = await invoiceById(invoiceId);
+        if (invoice == null) continue;
+        final returns = await (select(salesReturns)
+              ..where((t) => t.invoiceId.equals(invoiceId)))
+            .get();
+        final returned = returns.fold<int>(0, (sum, row) => sum + row.totalMinor);
+        final paidAndReturned = invoice.paidMinor + returned;
+        await (update(invoices)..where((t) => t.id.equals(invoiceId))).write(
+          InvoicesCompanion(
+            paymentStatus: Value(
+              paidAndReturned >= invoice.totalMinor
+                  ? 'paid'
+                  : paidAndReturned > 0
+                      ? 'partial'
+                      : 'unpaid',
+            ),
+          ),
+        );
+      }
+      for (final row in returnItemRows) {
+        final id = row['id'].toString();
+        final returnId = row['returnId'].toString();
+        if (existingReturnItemIds.contains(id)) continue;
+        if (!(existingReturnIds.contains(returnId) || importedReturnIds.contains(returnId))) continue;
+        await into(salesReturnItems).insert(SalesReturnItemsCompanion.insert(
+          id: id,
+          returnId: returnId,
+          invoiceItemId: row['invoiceItemId'].toString(),
+          itemId: row['itemId'].toString(),
+          itemNameSnapshot: row['itemNameSnapshot'].toString(),
+          quantity: _number(row['quantity']),
+          unitPriceMinor: _number(row['unitPriceMinor']),
+          taxRate: _decimal(row['taxRate']),
+          taxMinor: _number(row['taxMinor']),
+          lineTotalMinor: _number(row['lineTotalMinor']),
+        ));
+        imported++;
+      }
+
       for (final id in importedItemIds) {
         await into(syncQueue).insert(SyncQueueCompanion.insert(
           entityType: 'item', entityId: id, operation: 'upsert', createdAt: DateTime.now(),
@@ -1520,6 +2181,10 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> clearLocalData() async {
     await transaction(() async {
+      await delete(salesReturnItems).go();
+      await delete(salesReturns).go();
+      await delete(customerPayments).go();
+      await delete(supplierPayments).go();
       await delete(purchaseItems).go();
       await delete(stockBatches).go();
       await delete(purchases).go();
@@ -1538,6 +2203,16 @@ class AppDatabase extends _$AppDatabase {
     ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
     ..limit(limit))
     .get();
+}
+
+class SalesReturnLine {
+  const SalesReturnLine({
+    required this.invoiceItemId,
+    required this.quantity,
+  });
+
+  final String invoiceItemId;
+  final int quantity;
 }
 
 class PurchaseLine {

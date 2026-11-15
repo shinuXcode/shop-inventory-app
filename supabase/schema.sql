@@ -328,3 +328,190 @@ $;
 
 revoke all on function public.close_support_ticket(uuid) from public;
 grant execute on function public.close_support_ticket(uuid) to authenticated;
+
+
+-- Accounting and complete local-retail sync extension (schema v2, additive).
+alter table public.invoices add column if not exists paid_minor bigint not null default 0;
+alter table public.invoices add column if not exists payment_status text not null default 'paid';
+
+-- Existing invoices predate partial-payment ledgers: retain their previous settled/credit meaning.
+update public.invoices
+set paid_minor = case when lower(payment_method) = 'credit' then 0 else total_minor end,
+    payment_status = case when lower(payment_method) = 'credit' then 'unpaid' else 'paid' end
+where paid_minor = 0;
+
+create table if not exists public.suppliers (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  name text not null,
+  phone text,
+  email text,
+  gstin text,
+  address text,
+  created_at timestamptz not null,
+  updated_at timestamptz not null
+);
+
+create table if not exists public.purchases (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  purchase_number text not null,
+  supplier_id uuid not null references public.suppliers(id),
+  subtotal_minor bigint not null,
+  discount_minor bigint not null default 0,
+  tax_minor bigint not null default 0,
+  total_minor bigint not null,
+  paid_minor bigint not null default 0,
+  payment_status text not null default 'unpaid',
+  notes text,
+  created_at timestamptz not null,
+  unique (business_id, purchase_number)
+);
+
+create table if not exists public.purchase_items (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  purchase_id uuid not null references public.purchases(id) on delete cascade,
+  item_id uuid not null references public.items(id),
+  item_name_snapshot text not null,
+  quantity numeric(14,3) not null,
+  unit_cost_minor bigint not null,
+  tax_rate numeric(6,3) not null default 0,
+  tax_minor bigint not null default 0,
+  line_total_minor bigint not null
+);
+
+create table if not exists public.expenses (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  category text not null,
+  description text,
+  amount_minor bigint not null check (amount_minor > 0),
+  payment_method text not null default 'cash',
+  incurred_at timestamptz not null
+);
+
+create table if not exists public.stock_adjustments (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  item_id uuid not null references public.items(id),
+  quantity_delta integer not null check (quantity_delta <> 0),
+  reason text not null,
+  created_at timestamptz not null
+);
+
+create table if not exists public.stock_batches (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  item_id uuid not null references public.items(id),
+  purchase_item_id uuid references public.purchase_items(id) on delete set null,
+  quantity integer not null,
+  expiry_date timestamptz,
+  created_at timestamptz not null
+);
+
+create table if not exists public.customer_payments (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  customer_id uuid not null references public.customers(id),
+  invoice_id uuid references public.invoices(id) on delete set null,
+  amount_minor bigint not null check (amount_minor > 0),
+  payment_method text not null,
+  reference text,
+  notes text,
+  received_at timestamptz not null
+);
+
+create table if not exists public.supplier_payments (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  supplier_id uuid not null references public.suppliers(id),
+  purchase_id uuid references public.purchases(id) on delete set null,
+  amount_minor bigint not null check (amount_minor > 0),
+  payment_method text not null,
+  reference text,
+  notes text,
+  paid_at timestamptz not null
+);
+
+create table if not exists public.sales_returns (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  return_number text not null,
+  invoice_id uuid not null references public.invoices(id),
+  customer_id uuid references public.customers(id) on delete set null,
+  subtotal_minor bigint not null,
+  tax_minor bigint not null default 0,
+  total_minor bigint not null,
+  refund_method text not null,
+  notes text,
+  created_at timestamptz not null,
+  unique (business_id, return_number)
+);
+
+create table if not exists public.sales_return_items (
+  id uuid primary key,
+  business_id uuid not null references public.businesses(id) on delete cascade,
+  return_id uuid not null references public.sales_returns(id) on delete cascade,
+  invoice_item_id uuid not null references public.invoice_items(id),
+  item_id uuid not null references public.items(id),
+  item_name_snapshot text not null,
+  quantity numeric(14,3) not null check (quantity > 0),
+  unit_price_minor bigint not null,
+  tax_rate numeric(6,3) not null default 0,
+  tax_minor bigint not null default 0,
+  line_total_minor bigint not null
+);
+
+create index if not exists suppliers_business_idx on public.suppliers(business_id);
+create index if not exists purchases_business_date_idx on public.purchases(business_id, created_at desc);
+create index if not exists purchase_items_purchase_idx on public.purchase_items(purchase_id);
+create index if not exists expenses_business_date_idx on public.expenses(business_id, incurred_at desc);
+create index if not exists stock_adjustments_business_date_idx on public.stock_adjustments(business_id, created_at desc);
+create index if not exists stock_batches_expiry_idx on public.stock_batches(business_id, expiry_date);
+create index if not exists customer_payments_invoice_idx on public.customer_payments(invoice_id, received_at desc);
+create index if not exists supplier_payments_purchase_idx on public.supplier_payments(purchase_id, paid_at desc);
+create index if not exists sales_returns_invoice_idx on public.sales_returns(invoice_id, created_at desc);
+create index if not exists sales_return_items_return_idx on public.sales_return_items(return_id);
+
+-- All new business-scoped tables use the same tenant membership boundary.
+do $$
+declare
+  table_name text;
+begin
+  foreach table_name in array array[
+    'suppliers', 'purchases', 'purchase_items', 'expenses',
+    'stock_adjustments', 'stock_batches', 'customer_payments',
+    'supplier_payments', 'sales_returns', 'sales_return_items'
+  ] loop
+    execute format('alter table public.%I enable row level security', table_name);
+    execute format('drop policy if exists "business members can read rows" on public.%I', table_name);
+    execute format(
+      'create policy "business members can read rows" on public.%I for select to authenticated using (public.is_business_member(business_id))',
+      table_name
+    );
+    execute format('drop policy if exists "business members can insert rows" on public.%I', table_name);
+    execute format(
+      'create policy "business members can insert rows" on public.%I for insert to authenticated with check (public.is_business_member(business_id))',
+      table_name
+    );
+    execute format('drop policy if exists "business members can update rows" on public.%I', table_name);
+    execute format(
+      'create policy "business members can update rows" on public.%I for update to authenticated using (public.is_business_member(business_id)) with check (public.is_business_member(business_id))',
+      table_name
+    );
+  end loop;
+end;
+$$;
+
+grant select, insert, update on public.suppliers to authenticated;
+grant select, insert, update on public.purchases to authenticated;
+grant select, insert, update on public.purchase_items to authenticated;
+grant select, insert, update on public.expenses to authenticated;
+grant select, insert, update on public.stock_adjustments to authenticated;
+grant select, insert, update on public.stock_batches to authenticated;
+grant select, insert, update on public.customer_payments to authenticated;
+grant select, insert, update on public.supplier_payments to authenticated;
+grant select, insert, update on public.sales_returns to authenticated;
+grant select, insert, update on public.sales_return_items to authenticated;
+grant select, insert, update on public.invoices to authenticated;
