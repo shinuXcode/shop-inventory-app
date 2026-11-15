@@ -20,6 +20,7 @@ class Items extends Table {
   IntColumn get lowStockThreshold => integer().withDefault(const Constant(5))();
   TextColumn get category => text().nullable()();
   TextColumn get barcode => text().nullable()();
+  TextColumn get hsnSac => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -70,6 +71,7 @@ class InvoiceItems extends Table {
   TextColumn get itemId => text()();
   TextColumn get itemNameSnapshot => text()();
   TextColumn get skuSnapshot => text().nullable()();
+  TextColumn get hsnSacSnapshot => text().nullable()();
   IntColumn get quantity => integer()();
   IntColumn get unitPriceMinor => integer()();
   IntColumn get unitCostMinor => integer().withDefault(const Constant(0))();
@@ -178,7 +180,7 @@ class TopSellingItem {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
-  @override int get schemaVersion => 4;
+  @override int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -204,6 +206,10 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(invoiceItems, invoiceItems.cgstMinor);
             await m.addColumn(invoiceItems, invoiceItems.sgstMinor);
             await m.addColumn(invoiceItems, invoiceItems.igstMinor);
+          }
+          if (from < 5) {
+            await m.addColumn(items, items.hsnSac);
+            await m.addColumn(invoiceItems, invoiceItems.hsnSacSnapshot);
           }
         },
         beforeOpen: (details) async {
@@ -760,6 +766,7 @@ class AppDatabase extends _$AppDatabase {
           itemId: current.id,
           itemNameSnapshot: current.name,
           skuSnapshot: Value(current.sku),
+          hsnSacSnapshot: Value(current.hsnSac),
           quantity: line.quantity,
           unitPriceMinor: current.priceMinor,
           taxRate: current.taxRate,
@@ -866,7 +873,7 @@ class AppDatabase extends _$AppDatabase {
         'id': x.id, 'sku': x.sku, 'name': x.name, 'description': x.description,
         'priceMinor': x.priceMinor, 'costMinor': x.costMinor, 'taxRate': x.taxRate,
         'stockQuantity': x.stockQuantity, 'lowStockThreshold': x.lowStockThreshold,
-        'category': x.category, 'barcode': x.barcode, 'isActive': x.isActive,
+        'category': x.category, 'barcode': x.barcode, 'hsnSac': x.hsnSac, 'isActive': x.isActive,
         'createdAt': x.createdAt.toIso8601String(), 'updatedAt': x.updatedAt.toIso8601String(),
       }).toList(),
       'customers': customerRows.map((x) => {
@@ -883,7 +890,7 @@ class AppDatabase extends _$AppDatabase {
       }).toList(),
       'invoiceItems': invoiceItemRows.map((x) => {
         'id': x.id, 'invoiceId': x.invoiceId, 'itemId': x.itemId,
-        'itemNameSnapshot': x.itemNameSnapshot, 'skuSnapshot': x.skuSnapshot,
+        'itemNameSnapshot': x.itemNameSnapshot, 'skuSnapshot': x.skuSnapshot, 'hsnSacSnapshot': x.hsnSacSnapshot,
         'quantity': x.quantity, 'unitPriceMinor': x.unitPriceMinor,
         'unitCostMinor': x.unitCostMinor, 'lineDiscountMinor': x.lineDiscountMinor,
         'cgstMinor': x.cgstMinor, 'sgstMinor': x.sgstMinor, 'igstMinor': x.igstMinor,
@@ -1104,6 +1111,7 @@ class AppDatabase extends _$AppDatabase {
           lowStockThreshold: Value(_number(row['lowStockThreshold'], 5)),
           category: Value(_nullable(row['category'])),
           barcode: Value(_nullable(row['barcode'])),
+          hsnSac: Value(_nullable(row['hsnSac'])),
           isActive: Value(row['isActive'] != false),
           createdAt: Value(_rowDate(row['createdAt']) ?? createdNow),
           updatedAt: Value(createdNow),
@@ -1166,6 +1174,7 @@ class AppDatabase extends _$AppDatabase {
           itemId: Value(row['itemId'].toString()),
           itemNameSnapshot: Value(row['itemNameSnapshot'].toString()),
           skuSnapshot: Value(_nullable(row['skuSnapshot'])),
+          hsnSacSnapshot: Value(_nullable(row['hsnSacSnapshot'])),
           quantity: Value(_number(row['quantity'])),
           unitPriceMinor: Value(_number(row['unitPriceMinor'])),
           unitCostMinor: Value(_number(row['unitCostMinor'])),
