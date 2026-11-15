@@ -453,8 +453,19 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
       final normalizedSku = sku.text.trim();
       final normalizedBarcode = barcode.text.trim();
       final normalizedHsnSac = hsnSac.text.trim();
+      final hsnLengthValid = const [4, 6, 8].contains(normalizedHsnSac.length);
+      final hsnDigitsOnly = normalizedHsnSac.codeUnits.every(
+        (unit) => unit >= 48 && unit <= 57,
+      );
       if (normalizedHsnSac.isNotEmpty &&
-          !RegExp(r'^\\d{4}(?:\\d{2}){0,2}
+          (!hsnLengthValid || !hsnDigitsOnly)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('HSN/SAC must contain 4, 6 or 8 digits.')),
+          );
+        }
+        return;
+      }
       final duplicate = await ref.read(databaseProvider).findItemConflict(
         sku: normalizedSku,
         barcode: normalizedBarcode,
