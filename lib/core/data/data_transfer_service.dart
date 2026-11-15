@@ -270,22 +270,8 @@ class DataTransferService {
     return errors;
   }
 
-  static List<String> _validateBackup(Map<String, dynamic> snapshot) {
-    final errors = <String>[];
-    final items = (snapshot['items'] as List?)?.whereType<Map>().toList() ?? const [];
-    final customers = (snapshot['customers'] as List?)?.whereType<Map>().toList() ?? const [];
-    for (var i = 0; i < items.length; i++) {
-      if ((items[i]['id']?.toString().trim() ?? '').isEmpty || (items[i]['name']?.toString().trim() ?? '').isEmpty) {
-        errors.add('Backup product row ' + (i + 1).toString() + ': required identity is missing.');
-      }
-    }
-    for (var i = 0; i < customers.length; i++) {
-      if ((customers[i]['id']?.toString().trim() ?? '').isEmpty || (customers[i]['name']?.toString().trim() ?? '').isEmpty) {
-        errors.add('Backup customer row ' + (i + 1).toString() + ': required identity is missing.');
-      }
-    }
-    return errors;
-  }
+  static List<String> _validateBackup(Map<String, dynamic> snapshot) =>
+      AppDatabase.validateBackupSnapshot(snapshot);
 
   static String _rowValue(Map<String, String> row, List<String> keys) {
     for (final key in keys) {
