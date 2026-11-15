@@ -78,6 +78,8 @@ create table if not exists public.invoice_items (
   sku_snapshot text not null,
   quantity numeric(14,3) not null,
   unit_price_minor bigint not null,
+  unit_cost_minor bigint not null default 0,
+  line_discount_minor bigint not null default 0,
   tax_rate numeric(6,3) not null,
   tax_minor bigint not null,
   line_total_minor bigint not null
@@ -91,6 +93,9 @@ create table if not exists public.sync_events (
   operation text not null,
   created_at timestamptz not null default now()
 );
+
+alter table public.invoice_items add column if not exists unit_cost_minor bigint not null default 0;
+alter table public.invoice_items add column if not exists line_discount_minor bigint not null default 0;
 
 create index if not exists items_business_idx on public.items(business_id);
 create index if not exists items_barcode_idx on public.items(business_id, barcode);
