@@ -169,6 +169,11 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         phone: settings.businessPhone,
         gstNumber: settings.gstNumber,
         footerText: settings.invoiceFooter,
+        invoiceTitle: settings.invoiceTitle,
+        termsText: settings.invoiceTerms,
+        currencyCode: settings.currency,
+        showLogo: settings.showInvoiceLogo,
+        showSku: settings.showSkuOnInvoice,
         thermal: thermal,
       );
     } catch (e) {
@@ -189,6 +194,11 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         phone: settings.businessPhone,
         gstNumber: settings.gstNumber,
         footerText: settings.invoiceFooter,
+        invoiceTitle: settings.invoiceTitle,
+        termsText: settings.invoiceTerms,
+        currencyCode: settings.currency,
+        showLogo: settings.showInvoiceLogo,
+        showSku: settings.showSkuOnInvoice,
       );
     } catch (e) {
       if (!mounted) return;
