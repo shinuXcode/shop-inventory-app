@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../app.dart';
 import '../../core/billing/billing_calculator.dart';
+import '../../core/billing/money_formatter.dart';
 import '../../core/database/app_database.dart';
 import '../../core/settings/app_settings.dart';
 
@@ -127,7 +128,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
     return parsed < 0 ? 0 : (parsed * 100).round();
   }
 
-  String _money(int minor) => '₹' + (minor / 100).toStringAsFixed(2);
+  String _money(int minor) => MoneyFormatter.format(minor, currencyCode: settings?.currency ?? 'INR');
 
   @override
   Widget build(BuildContext context) {
@@ -349,7 +350,7 @@ class _BillingPageState extends ConsumerState<BillingPage> {
           inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
           textAlign: TextAlign.end,
           onChanged: (_) => setState(() {}),
-          decoration: const InputDecoration(prefixText: '₹ ', isDense: true),
+          decoration: const InputDecoration(prefixText: 'INR ', isDense: true),
         ),
       ),
     ]),
