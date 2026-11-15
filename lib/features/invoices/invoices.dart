@@ -144,14 +144,14 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                 runSpacing: 8,
                 children: [
                   FilledButton.tonalIcon(
-                    onPressed: () => _print(invoice, items, settings),
+                    onPressed: () => _print(invoice, items, settings, thermal: settings.thermalReceipt),
                     icon: const Icon(Icons.print_outlined),
-                    label: const Text('Print A4'),
+                    label: Text(settings.thermalReceipt ? 'Print Thermal (default)' : 'Print A4 (default)'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => _print(invoice, items, settings, thermal: true),
+                    onPressed: () => _print(invoice, items, settings, thermal: !settings.thermalReceipt),
                     icon: const Icon(Icons.receipt_long_outlined),
-                    label: const Text('Print Thermal'),
+                    label: Text(settings.thermalReceipt ? 'Print A4' : 'Print Thermal'),
                   ),
                   OutlinedButton.icon(
                     onPressed: () => _share(invoice, items, settings),
@@ -212,6 +212,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         currencyCode: settings.currency,
         showLogo: settings.showInvoiceLogo,
         showSku: settings.showSkuOnInvoice,
+        thermal: settings.thermalReceipt,
       );
     } catch (e) {
       if (!mounted) return;
