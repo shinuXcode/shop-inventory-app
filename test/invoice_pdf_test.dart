@@ -84,7 +84,7 @@ void main() {
         items: [item()],
         shopName: 'दुकान',
       ),
-      throwsUnsupportedError,
+      throwsA(isA<UnsupportedError>()),
     );
   });
 }
