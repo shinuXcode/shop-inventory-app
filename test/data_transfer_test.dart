@@ -247,4 +247,27 @@ void main() {
     expect(lines.single.itemNameSnapshot, 'Merge Item');
   });
 
+
+  test('invalid backup rows are not marked valid and cannot be restored', () async {
+    final db = AppDatabase.forTesting();
+    addTearDown(db.close);
+    final preview = DataTransferService.parseFile(
+      'invalid-backup.json',
+      utf8.encode(jsonEncode({
+        'format': 'sbill-backup-v1',
+        'items': [
+          {'name': 'Missing identity'},
+        ],
+      })),
+    );
+
+    expect(preview.isValid, isFalse);
+    expect(preview.validationErrors, isNotEmpty);
+    await expectLater(
+      DataTransferService.importPreview(db, preview),
+      throwsA(isA<StateError>()),
+    );
+    expect(await db.select(db.items).get(), isEmpty);
+  });
+
 }
