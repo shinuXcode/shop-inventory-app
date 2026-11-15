@@ -154,9 +154,8 @@ class StockAdjustments extends Table {
   @override Set<Column<Object>> get primaryKey => {id};
 }
 
-class StockBatchRows extends Table {
-  @override
-  String get tableName => 'stock_batches';
+@DataClassName('StockBatchRow')
+class StockBatches extends Table {
   TextColumn get id => text()();
   TextColumn get itemId => text()();
   TextColumn get purchaseItemId => text().nullable()();
@@ -178,7 +177,7 @@ class TopSellingItem {
   final int totalMinor;
 }
 
-@DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments, StockBatchRows])
+@DriftDatabase(tables: [Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments, StockBatches])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
@@ -194,7 +193,7 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(purchaseItems);
             await m.createTable(expenses);
             await m.createTable(stockAdjustments);
-            await m.createTable(stockBatchRows);
+            await m.createTable(stockBatches);
           }
           if (from < 3) {
             await m.addColumn(invoiceItems, invoiceItems.unitCostMinor);
@@ -491,7 +490,7 @@ class AppDatabase extends _$AppDatabase {
           taxMinor: tax,
           lineTotalMinor: base - allocatedDiscount + tax,
         ));
-        await into(stockBatchRows).insert(StockBatchRowsCompanion.insert(
+        await into(stockBatches).insert(StockBatchRowCompanion.insert(
           id: const Uuid().v4(),
           itemId: item.id,
           purchaseItemId: Value(line.id),
@@ -555,7 +554,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> _consumeStockBatches(String itemId, int quantity) async {
     if (quantity <= 0) return;
-    final batches = await (select(stockBatchRows)
+    final batches = await (select(stockBatches)
           ..where((t) =>
               t.itemId.equals(itemId) & t.quantity.isBiggerThanValue(0)))
         .get();
@@ -569,8 +568,8 @@ class AppDatabase extends _$AppDatabase {
     for (final batch in batches) {
       if (remaining == 0) break;
       final consumed = batch.quantity < remaining ? batch.quantity : remaining;
-      await (update(stockBatchRows)..where((t) => t.id.equals(batch.id))).write(
-        StockBatchRowsCompanion(quantity: Value(batch.quantity - consumed)),
+      await (update(stockBatches)..where((t) => t.id.equals(batch.id))).write(
+        StockBatchRowCompanion(quantity: Value(batch.quantity - consumed)),
       );
       remaining -= consumed;
     }
@@ -611,7 +610,7 @@ class AppDatabase extends _$AppDatabase {
       if (quantityDelta < 0) {
         await _consumeStockBatches(itemId, -quantityDelta);
       } else {
-        await into(stockBatchRows).insert(StockBatchRowsCompanion.insert(
+        await into(stockBatches).insert(StockBatchRowCompanion.insert(
           id: const Uuid().v4(),
           itemId: itemId,
           quantity: quantityDelta,
@@ -636,7 +635,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<StockBatchRow>> expiringStock({int withinDays = 30}) async {
     final end = DateTime.now().add(Duration(days: withinDays));
-    final rows = await (select(stockBatchRows)
+    final rows = await (select(stockBatches)
           ..where((t) =>
               t.quantity.isBiggerThanValue(0) & t.expiryDate.isNotNull()))
         .get();
@@ -926,7 +925,7 @@ class AppDatabase extends _$AppDatabase {
     final purchaseItemRows = await select(purchaseItems).get();
     final expenseRows = await select(expenses).get();
     final adjustmentRows = await select(stockAdjustments).get();
-    final batchRows = await select(stockBatchRows).get();
+    final batchRows = await select(stockBatches).get();
     return {
       'format': 'sbill-backup-v1',
       'exportedAt': DateTime.now().toIso8601String(),
@@ -1137,7 +1136,7 @@ class AppDatabase extends _$AppDatabase {
     final purchaseItemRows = (snapshot['purchaseItems'] as List?)?.whereType<Map>().toList() ?? const [];
     final expenseRows = (snapshot['expenses'] as List?)?.whereType<Map>().toList() ?? const [];
     final adjustmentRows = (snapshot['stockAdjustments'] as List?)?.whereType<Map>().toList() ?? const [];
-    final batchRows = (snapshot['stockBatchRows'] as List?)?.whereType<Map>().toList() ?? const [];
+    final batchRows = (snapshot['stockBatches'] as List?)?.whereType<Map>().toList() ?? const [];
 
     var imported = 0;
     final importedItemIds = <String>[];
@@ -1157,7 +1156,7 @@ class AppDatabase extends _$AppDatabase {
       final existingPurchaseItemIds = (await select(purchaseItems).get()).map((row) => row.id).toSet();
       final existingExpenseIds = (await select(expenses).get()).map((row) => row.id).toSet();
       final existingAdjustmentIds = (await select(stockAdjustments).get()).map((row) => row.id).toSet();
-      final existingBatchIds = (await select(stockBatchRows).get()).map((row) => row.id).toSet();
+      final existingBatchIds = (await select(stockBatches).get()).map((row) => row.id).toSet();
 
       for (final row in itemRows) {
         final id = row['id'].toString();
@@ -1338,7 +1337,7 @@ class AppDatabase extends _$AppDatabase {
       for (final row in batchRows) {
         final id = row['id'].toString();
         if (existingBatchIds.contains(id)) continue;
-        await into(stockBatchRows).insert(StockBatchRowsCompanion.insert(
+        await into(stockBatches).insert(StockBatchRowCompanion.insert(
           id: id,
           itemId: row['itemId'].toString(),
           purchaseItemId: Value(_nullable(row['purchaseItemId'])),
@@ -1414,7 +1413,7 @@ class AppDatabase extends _$AppDatabase {
   Future<void> clearLocalData() async {
     await transaction(() async {
       await delete(purchaseItems).go();
-      await delete(stockBatchRows).go();
+      await delete(stockBatches).go();
       await delete(purchases).go();
       await delete(suppliers).go();
       await delete(expenses).go();
