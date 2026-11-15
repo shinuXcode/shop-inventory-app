@@ -162,4 +162,23 @@ void main() {
     expect(line.cgstMinor, 0);
     expect(line.sgstMinor, 0);
   });
+
+  test('checkout rejects a stale cart after product price or GST changes', () async {
+    final staleItem = await seedItem();
+    await (db.update(db.items)..where((table) => table.id.equals(staleItem.id)))
+        .write(const ItemsCompanion(priceMinor: Value(21000)));
+
+    await expectLater(
+      db.checkout(
+        invoiceId: 'invoice-stale-price',
+        invoiceNumber: 'INV-STALE-PRICE',
+        cart: [CartLine(id: 'line-stale-price', item: staleItem, quantity: 1)],
+        discountMinor: 0,
+        paymentMethod: 'cash',
+      ),
+      throwsStateError,
+    );
+    expect(await db.select(db.invoices).get(), isEmpty);
+    expect((await db.select(db.items).getSingle()).stockQuantity, 10);
+  });
 }
