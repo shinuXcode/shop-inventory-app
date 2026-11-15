@@ -4,6 +4,7 @@ class BillingLine {
     required this.quantity,
     required this.taxRateBps,
   });
+
   final int unitPriceMinor;
   final int quantity;
   final int taxRateBps;
@@ -16,6 +17,7 @@ class BillingTotals {
     required this.discountMinor,
     required this.totalMinor,
   });
+
   final int subtotalMinor;
   final int taxMinor;
   final int discountMinor;
@@ -25,10 +27,33 @@ class BillingTotals {
 class BillingCalculator {
   const BillingCalculator();
 
-  int lineSubtotal(BillingLine line) => line.unitPriceMinor * line.quantity;
+  void _validateLine(BillingLine line) {
+    if (line.unitPriceMinor < 0) {
+      throw ArgumentError.value(line.unitPriceMinor, 'unitPriceMinor');
+    }
+    if (line.quantity <= 0) {
+      throw ArgumentError.value(line.quantity, 'quantity');
+    }
+    if (line.taxRateBps < 0 || line.taxRateBps > 10000) {
+      throw ArgumentError.value(line.taxRateBps, 'taxRateBps');
+    }
+  }
 
-  int taxFor(int baseMinor, int taxRateBps) =>
-      ((baseMinor * taxRateBps) / 10000).round();
+  int lineSubtotal(BillingLine line) {
+    _validateLine(line);
+    return line.unitPriceMinor * line.quantity;
+  }
+
+  int taxFor(int baseMinor, int taxRateBps) {
+    if (baseMinor < 0) {
+      throw ArgumentError.value(baseMinor, 'baseMinor');
+    }
+    if (taxRateBps < 0 || taxRateBps > 10000) {
+      throw ArgumentError.value(taxRateBps, 'taxRateBps');
+    }
+    // Integer-only half-up rounding avoids floating-point currency drift.
+    return (baseMinor * taxRateBps + 5000) ~/ 10000;
+  }
 
   BillingTotals calculate({
     required List<BillingLine> lines,
@@ -37,16 +62,32 @@ class BillingCalculator {
     if (discountMinor < 0) {
       throw ArgumentError.value(discountMinor, 'discountMinor');
     }
-    final subtotal = lines.fold<int>(0, (sum, line) => sum + lineSubtotal(line));
+    final subtotal = lines.fold<int>(
+      0,
+      (sum, line) => sum + lineSubtotal(line),
+    );
     if (discountMinor > subtotal) {
       throw ArgumentError('Discount cannot exceed subtotal.');
     }
+
+    var remainingDiscount = discountMinor;
+    var remainingSubtotal = subtotal;
+    var tax = 0;
+    for (var index = 0; index < lines.length; index++) {
+      final line = lines[index];
+      final base = lineSubtotal(line);
+      final allocatedDiscount = index == lines.length - 1
+          ? remainingDiscount
+          : remainingSubtotal == 0
+              ? 0
+              : (base * remainingDiscount + remainingSubtotal ~/ 2) ~/
+                  remainingSubtotal;
+      remainingDiscount -= allocatedDiscount;
+      remainingSubtotal -= base;
+      tax += taxFor(base - allocatedDiscount, line.taxRateBps);
+    }
+
     final taxable = subtotal - discountMinor;
-    final tax = lines.fold<int>(0, (sum, line) {
-      final lineBase = lineSubtotal(line);
-      final lineDiscount = subtotal == 0 ? 0 : ((lineBase * discountMinor) / subtotal).round();
-      return sum + taxFor(lineBase - lineDiscount, line.taxRateBps);
-    });
     return BillingTotals(
       subtotalMinor: subtotal,
       taxMinor: tax,

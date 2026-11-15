@@ -124,6 +124,9 @@ class SyncService {
   }
 
   Future<void> _push(SyncQueueData event, String businessId, SupabaseClient client) async {
+    if (event.operation != 'upsert') {
+      throw StateError('Unsupported sync operation: ${event.operation}');
+    }
     switch (event.entityType) {
       case 'item':
         final item = await (db.select(db.items)..where((t) => t.id.equals(event.entityId))).getSingleOrNull();
@@ -139,6 +142,7 @@ class SyncService {
           'name': item.name,
           'description': item.description,
           'barcode': item.barcode,
+          'hsn_sac': item.hsnSac,
           'price_minor': item.priceMinor,
           'cost_minor': item.costMinor,
           'tax_rate': item.taxRate,
@@ -186,6 +190,10 @@ class SyncService {
           'subtotal_minor': invoice.subtotalMinor,
           'discount_minor': invoice.discountMinor,
           'tax_minor': invoice.taxMinor,
+          'cgst_minor': invoice.cgstMinor,
+          'sgst_minor': invoice.sgstMinor,
+          'igst_minor': invoice.igstMinor,
+          'gst_supply_type': invoice.gstSupplyType,
           'total_minor': invoice.totalMinor,
           'payment_method': invoice.paymentMethod,
           'status': invoice.status,
@@ -203,8 +211,14 @@ class SyncService {
             'item_id': item.itemId,
             'item_name_snapshot': item.itemNameSnapshot,
             'sku_snapshot': item.skuSnapshot ?? '',
+            'hsn_sac_snapshot': item.hsnSacSnapshot,
             'quantity': item.quantity,
             'unit_price_minor': item.unitPriceMinor,
+            'unit_cost_minor': item.unitCostMinor,
+            'line_discount_minor': item.lineDiscountMinor,
+            'cgst_minor': item.cgstMinor,
+            'sgst_minor': item.sgstMinor,
+            'igst_minor': item.igstMinor,
             'tax_rate': item.taxRate,
             'tax_minor': item.taxMinor,
             'line_total_minor': item.lineTotalMinor,
@@ -213,27 +227,51 @@ class SyncService {
         break;
 
       default:
-        break;
+        // Never acknowledge an event that this client does not understand.
+        throw StateError('Unsupported sync entity type: ${event.entityType}');
     }
   }
 
+  Future<List<Map<String, dynamic>>> _fetchAllBusinessRows(
+    SupabaseClient client,
+    String table,
+    String businessId,
+  ) async {
+    const pageSize = 500;
+    var offset = 0;
+    final rows = <Map<String, dynamic>>[];
+    while (true) {
+      final page = await client
+          .from(table)
+          .select()
+          .eq('business_id', businessId)
+          .order('id')
+          .range(offset, offset + pageSize - 1);
+      final batch = List<Map<String, dynamic>>.from(page);
+      rows.addAll(batch);
+      if (batch.length < pageSize) break;
+      offset += pageSize;
+    }
+    return rows;
+  }
+
   Future<void> _pullLatest(String businessId, SupabaseClient client) async {
-    final itemRows = await client.from('items').select().eq('business_id', businessId);
+    final itemRows = await _fetchAllBusinessRows(client, 'items', businessId);
     for (final row in itemRows) {
       await _applyRemoteItem(row);
     }
 
-    final customerRows = await client.from('customers').select().eq('business_id', businessId);
+    final customerRows = await _fetchAllBusinessRows(client, 'customers', businessId);
     for (final row in customerRows) {
       await _applyRemoteCustomer(row);
     }
 
-    final invoiceRows = await client.from('invoices').select().eq('business_id', businessId);
+    final invoiceRows = await _fetchAllBusinessRows(client, 'invoices', businessId);
     for (final row in invoiceRows) {
       await _applyRemoteInvoice(row);
     }
 
-    final invoiceItemRows = await client.from('invoice_items').select().eq('business_id', businessId);
+    final invoiceItemRows = await _fetchAllBusinessRows(client, 'invoice_items', businessId);
     for (final row in invoiceItemRows) {
       await _applyRemoteInvoiceItem(row);
     }
@@ -267,6 +305,7 @@ class SyncService {
       name: Value(row['name'].toString()),
       description: Value(row['description']?.toString()),
       barcode: Value(row['barcode']?.toString()),
+      hsnSac: Value(row['hsn_sac']?.toString()),
       priceMinor: Value((row['price_minor'] as num?)?.toInt() ?? 0),
       costMinor: Value((row['cost_minor'] as num?)?.toInt() ?? 0),
       taxRate: Value((row['tax_rate'] as num?)?.toDouble() ?? 0),
@@ -304,6 +343,10 @@ class SyncService {
       subtotalMinor: Value((row['subtotal_minor'] as num?)?.toInt() ?? 0),
       discountMinor: Value((row['discount_minor'] as num?)?.toInt() ?? 0),
       taxMinor: Value((row['tax_minor'] as num?)?.toInt() ?? 0),
+      cgstMinor: Value((row['cgst_minor'] as num?)?.toInt() ?? 0),
+      sgstMinor: Value((row['sgst_minor'] as num?)?.toInt() ?? 0),
+      igstMinor: Value((row['igst_minor'] as num?)?.toInt() ?? 0),
+      gstSupplyType: Value(row['gst_supply_type']?.toString() ?? 'unknown'),
       totalMinor: Value((row['total_minor'] as num?)?.toInt() ?? 0),
       paymentMethod: Value(row['payment_method'].toString()),
       status: Value(row['status']?.toString() ?? 'completed'),
@@ -322,8 +365,14 @@ class SyncService {
       itemId: Value(row['item_id'].toString()),
       itemNameSnapshot: Value(row['item_name_snapshot'].toString()),
       skuSnapshot: Value(row['sku_snapshot']?.toString()),
+      hsnSacSnapshot: Value(row['hsn_sac_snapshot']?.toString()),
       quantity: Value((row['quantity'] as num?)?.toInt() ?? 0),
       unitPriceMinor: Value((row['unit_price_minor'] as num?)?.toInt() ?? 0),
+      unitCostMinor: Value((row['unit_cost_minor'] as num?)?.toInt() ?? 0),
+      lineDiscountMinor: Value((row['line_discount_minor'] as num?)?.toInt() ?? 0),
+      cgstMinor: Value((row['cgst_minor'] as num?)?.toInt() ?? 0),
+      sgstMinor: Value((row['sgst_minor'] as num?)?.toInt() ?? 0),
+      igstMinor: Value((row['igst_minor'] as num?)?.toInt() ?? 0),
       taxRate: Value((row['tax_rate'] as num?)?.toDouble() ?? 0),
       taxMinor: Value((row['tax_minor'] as num?)?.toInt() ?? 0),
       lineTotalMinor: Value((row['line_total_minor'] as num?)?.toInt() ?? 0),

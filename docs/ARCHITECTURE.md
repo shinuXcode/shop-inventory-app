@@ -1,56 +1,67 @@
 # SBILL Architecture
 
-## Phase 0 audit
-- Flutter/Dart: declared SDK >=3.3.0 <4.0.0; CI uses the current stable Flutter channel.
-- Architecture: Flutter + Riverpod + Drift/SQLite with a feature-oriented folder layout.
-- Screens: Dashboard, Billing, Inventory, Customers, Invoices.
-- Routing/navigation: adaptive NavigationRail/NavigationBar shell; no dedicated route package yet.
-- Database: Drift/SQLite with Items, Customers, Invoices, InvoiceItems and SyncQueue.
-- Cloud: optional Supabase Auth + PostgreSQL/RLS with email authentication, workspace bootstrap RPC, persisted sync queue and idempotent upserts.
-- Website: responsive static product website under website/ with feature, privacy, workflow and download sections.
-- Assets: no external asset pipeline currently required; Material icons are used.
-- Tests: a basic cart unit test exists.
-- CI/CD: GitHub Actions pins the Flutter toolchain and verifies analysis, tests, Android, Windows, macOS and unsigned iOS compilation.
+## Current architecture
 
-## Proposed production architecture
-- Presentation: feature pages + Riverpod state/controllers.
-- Domain: deterministic billing calculations and business rules.
-- Data: Drift repositories as the local source of truth; sync queue persisted locally.
-- Cloud: Supabase Auth + PostgreSQL + RLS, isolated by business/workspace.
-- Services: PDF/printing, synchronization, connectivity, settings and desktop shortcuts.
-- UI: Material 3 tokens and reusable responsive components.
+- Flutter/Dart with Material 3 and Riverpod.
+- Adaptive navigation for Dashboard, Billing, Inventory, Customers, Invoices, Purchases and Settings.
+- Drift/SQLite is the local source of truth.
+- Database schema version 5; versioned migrations preserve existing installations.
+- Local tables: Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments and StockBatches.
+- Billing uses integer minor units, per-invoice intra-state CGST/SGST or inter-state IGST selection, and a transactional stock update. The supply type is currently selected manually; automatic place-of-supply determination from GSTIN/state codes remains future work.
+- Invoice lines retain historical item name, SKU, selling price, cost, discount, tax and line total snapshots.
+- PDF generation supports multi-page A4 and 80 mm thermal layouts, print/share/save, configurable heading/terms/footer/logo/SKU.
+- Optional Supabase Auth + PostgreSQL/RLS is available for the original business, item, customer and invoice sync entities.
+- Supplier/purchase/expense/adjustment/expiry history is currently local-first and backup-restorable; it is not yet synchronized as separate cloud entities.
 
-## Important existing components
-- lib/app.dart
-- lib/core/database/app_database.dart
-- lib/core/theme.dart
-- lib/core/pdf/invoice_pdf_service.dart
-- lib/core/sync/sync_service.dart
-- lib/features/*
+## Retail domain workflows
 
-## Files to modify
-- Database/repository and billing services
-- Feature screens for inventory, customers, billing and invoices
-- Theme/app shell
-- Sync service
-- PDF service
-- Supabase schema
-- CI workflow
-- README
+### Checkout
 
-## Files to create
-- docs/ARCHITECTURE.md
-- docs/RELEASE_CHECKLIST.md
-- reusable UI/token files
-- billing calculation tests
-- database/transaction tests
-- Supabase security tests/documentation
+1. Aggregate cart quantities by item ID.
+2. Re-read active items and current stock inside the SQLite transaction.
+3. Calculate deterministic paise totals and discount allocation.
+4. Insert invoice and historical line snapshots.
+5. Conditionally decrement stock; abort the transaction if stock changed or is insufficient.
+6. Consume tracked expiry batches in earliest-expiry order.
+7. Enqueue item and invoice upserts.
 
-## Migration strategy
-1. Preserve the existing main-branch foundation.
-2. Add schema changes through Drift migrations rather than destructive resets.
-3. Keep local SQLite authoritative for billing.
-4. Add business/workspace identifiers locally before enabling cloud sync.
-5. Introduce Supabase Auth and RLS without making offline billing dependent on it.
-6. Validate each phase with analyzer/tests/builds before advancing.
-7. Never delete historical invoice snapshots when products change.
+### Purchasing and inventory
+
+- Supplier records and purchase headers/lines are stored locally.
+- Recording a purchase updates item cost and stock in the same transaction.
+- Purchase batches may carry an expiry date.
+- Stock adjustments require a reason and cannot create negative stock.
+- Sales and negative adjustments consume tracked batches.
+- Expenses are stored separately from sales.
+
+### Reporting
+
+- Daily sales and invoice counts use invoice records.
+- Gross profit uses line-level historical cost and discount snapshots; older invoices created before the migration have a zero cost snapshot and must be treated as incomplete for historical margin analysis.
+- Daily expenses are shown separately; do not interpret gross profit as net profit.
+
+## PDF and character handling
+
+- Currency in PDF output uses a printable currency code such as `INR`, avoiding the missing rupee glyph in built-in PDF fonts.
+- A4 output uses a paginating MultiPage layout.
+- Thermal output uses an 80 mm page format and paginates long receipts.
+- Full Devanagari and other complex-script font embedding remains unverified and must be completed before claiming full multilingual invoice support.
+
+## Important components
+
+- `lib/core/database/app_database.dart`
+- `lib/core/billing/billing_calculator.dart`
+- `lib/core/billing/indian_gst.dart`
+- `lib/core/pdf/invoice_pdf_service.dart`
+- `lib/core/sync/sync_service.dart`
+- `lib/features/purchases/purchases.dart`
+
+## Migration and release rules
+
+1. Never destructively reset an existing shop database.
+2. Add every schema change through a versioned Drift migration.
+3. Keep SQLite authoritative for offline checkout.
+4. Never recompute historical invoice values from today's product price/cost.
+5. Preserve invoice item snapshots when products are renamed or archived.
+6. Validate migrations, transactions, backups, sync and all supported platform builds before release.
+7. Treat Supabase staging multi-device tests as a mandatory release gate.

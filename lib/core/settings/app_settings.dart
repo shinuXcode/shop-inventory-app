@@ -12,6 +12,10 @@ class AppSettings {
   String get gstNumber => _prefs.getString('gstNumber') ?? '';
   String get invoicePrefix => _prefs.getString('invoicePrefix') ?? 'INV';
   String get invoiceFooter => _prefs.getString('invoiceFooter') ?? 'Thank you for your business.';
+  String get invoiceTitle => _prefs.getString('invoiceTitle') ?? 'TAX INVOICE';
+  String get invoiceTerms => _prefs.getString('invoiceTerms') ?? '';
+  bool get showInvoiceLogo => _prefs.getBool('showInvoiceLogo') ?? true;
+  bool get showSkuOnInvoice => _prefs.getBool('showSkuOnInvoice') ?? true;
   String get currency => _prefs.getString('currency') ?? 'INR';
   bool get thermalReceipt => _prefs.getBool('thermalReceipt') ?? false;
   bool get darkMode => _prefs.getBool('darkMode') ?? false;
@@ -31,6 +35,10 @@ class AppSettings {
     required bool darkMode,
     String currency = 'INR',
     String invoiceFooter = 'Thank you for your business.',
+    String invoiceTitle = 'TAX INVOICE',
+    String invoiceTerms = '',
+    bool showInvoiceLogo = true,
+    bool showSkuOnInvoice = true,
     String? businessId,
     String? accountUserId,
   }) async {
@@ -44,6 +52,10 @@ class AppSettings {
     await _prefs.setBool('thermalReceipt', thermalReceipt);
     await _prefs.setBool('darkMode', darkMode);
     await _prefs.setString('invoiceFooter', invoiceFooter.trim().isEmpty ? 'Thank you for your business.' : invoiceFooter.trim());
+    await _prefs.setString('invoiceTitle', invoiceTitle.trim().isEmpty ? 'INVOICE' : invoiceTitle.trim());
+    await _prefs.setString('invoiceTerms', invoiceTerms.trim());
+    await _prefs.setBool('showInvoiceLogo', showInvoiceLogo);
+    await _prefs.setBool('showSkuOnInvoice', showSkuOnInvoice);
     if (businessId != null && businessId.isNotEmpty) {
       await _prefs.setString('businessId', businessId);
     }

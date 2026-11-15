@@ -7,6 +7,18 @@ String userFacingError(
   Object error, {
   String fallback = 'Something went wrong. Please try again.',
 }) {
+  if (error is UnsupportedError) {
+    return error.message?.toString() ?? fallback;
+  }
+
+  if (error is StateError) {
+    return error.message.toString();
+  }
+
+  if (error is ArgumentError) {
+    return error.message?.toString() ?? fallback;
+  }
+
   if (error is AuthException) {
     final message = error.message.toLowerCase();
     if (message.contains('invalid login credentials')) {

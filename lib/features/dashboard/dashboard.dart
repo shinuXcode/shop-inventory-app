@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../app.dart';
 import '../../core/database/app_database.dart';
+import '../../core/billing/money_formatter.dart';
 import '../shell/shell.dart';
 
 final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
@@ -12,16 +13,33 @@ final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) as
   final lowStock = await db.lowStockCount();
   final topSellers = await db.topSellingItems(limit: 5);
   final creditOutstanding = await db.creditOutstandingMinor();
-  return DashboardData(invoices: invoices, lowStock: lowStock, topSellers: topSellers, creditOutstanding: creditOutstanding);
+  final now = DateTime.now();
+  final start = DateTime(now.year, now.month, now.day);
+  final end = start.add(const Duration(days: 1));
+  final grossProfit = await db.grossProfitBetween(start, end);
+  final expenses = await db.expensesBetween(start, end);
+  final gstSummary = await db.gstSummaryBetween(start, end);
+  return DashboardData(
+    invoices: invoices,
+    lowStock: lowStock,
+    topSellers: topSellers,
+    creditOutstanding: creditOutstanding,
+    grossProfit: grossProfit,
+    expenses: expenses,
+    gstSummary: gstSummary,
+  );
 });
 
 class DashboardData {
-  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers, required this.creditOutstanding});
+  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers, required this.creditOutstanding, required this.grossProfit, required this.expenses, required this.gstSummary});
 
   final List<Invoice> invoices;
   final int lowStock;
   final List<TopSellingItem> topSellers;
   final int creditOutstanding;
+  final int grossProfit;
+  final int expenses;
+  final GstSummary gstSummary;
 }
 
 class DashboardPage extends ConsumerWidget {
@@ -45,7 +63,7 @@ class DashboardPage extends ConsumerWidget {
       body: dashboard.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
-          child: Text('Dashboard data is temporarily unavailable. Please try again.),
+          child: Text('Dashboard data is temporarily unavailable. Please try again.'),
         ),
         data: (data) {
           final invoices = data.invoices;
@@ -91,7 +109,7 @@ class DashboardPage extends ConsumerWidget {
                       _metric(
                         context,
                         'Today’s sales',
-                        '₹' + (sales / 100).toStringAsFixed(2),
+                        MoneyFormatter.format(sales),
                         Icons.currency_rupee_outlined,
                       ),
                       _metric(
@@ -104,8 +122,8 @@ class DashboardPage extends ConsumerWidget {
                         context,
                         'Average bill',
                         today.isEmpty
-                            ? '₹0.00'
-                            : '₹' + (sales / 100 / today.length).toStringAsFixed(2),
+                            ? MoneyFormatter.format(0)
+                            : MoneyFormatter.format((sales / today.length).round()),
                         Icons.trending_up_outlined,
                       ),
                       _metric(
@@ -117,12 +135,47 @@ class DashboardPage extends ConsumerWidget {
                       _metric(
                         context,
                         'Credit outstanding',
-                        '₹' + (data.creditOutstanding / 100).toStringAsFixed(2),
+                        MoneyFormatter.format(data.creditOutstanding),
                         Icons.account_balance_wallet_outlined,
+                      ),
+                      _metric(
+                        context,
+                        'Gross profit (tracked)',
+                        MoneyFormatter.format(data.grossProfit),
+                        Icons.trending_up_outlined,
+                      ),
+                      _metric(
+                        context,
+                        'Expenses today',
+                        MoneyFormatter.format(data.expenses),
+                        Icons.receipt_outlined,
                       ),
                     ],
                   );
                 },
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('GST collected today', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 20,
+                        runSpacing: 8,
+                        children: [
+                          _gstValue(context, 'CGST', data.gstSummary.cgstMinor),
+                          _gstValue(context, 'SGST', data.gstSummary.sgstMinor),
+                          _gstValue(context, 'IGST', data.gstSummary.igstMinor),
+                          _gstValue(context, 'Total GST', data.gstSummary.totalMinor),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 18),
               Text(
@@ -183,7 +236,7 @@ class DashboardPage extends ConsumerWidget {
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '₹' + (value / 100).toStringAsFixed(0),
+                                      MoneyFormatter.format(value),
                                       style: Theme.of(context)
                                           .textTheme
                                           .labelSmall,
@@ -294,6 +347,17 @@ class DashboardPage extends ConsumerWidget {
         onPressed: () => Shell.navigateTo(context, destination),
         icon: Icon(icon),
         label: Text(label),
+      );
+
+  Widget _gstValue(BuildContext context, String label, int amount) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
+          Text(
+            MoneyFormatter.format(amount),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
       );
 
   Widget _metric(

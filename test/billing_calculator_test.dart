@@ -37,4 +37,30 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('rejects negative prices, zero quantities and invalid tax rates', () {
+    expect(() => calculator.calculate(
+      lines: const [BillingLine(unitPriceMinor: -1, quantity: 1, taxRateBps: 0)],
+    ), throwsArgumentError);
+    expect(() => calculator.calculate(
+      lines: const [BillingLine(unitPriceMinor: 100, quantity: 0, taxRateBps: 0)],
+    ), throwsArgumentError);
+    expect(() => calculator.calculate(
+      lines: const [BillingLine(unitPriceMinor: 100, quantity: 1, taxRateBps: 10001)],
+    ), throwsArgumentError);
+  });
+
+  test('allocates discounts using integer paise without losing a paise', () {
+    final result = calculator.calculate(
+      lines: const [
+        BillingLine(unitPriceMinor: 100, quantity: 1, taxRateBps: 0),
+        BillingLine(unitPriceMinor: 200, quantity: 1, taxRateBps: 0),
+        BillingLine(unitPriceMinor: 300, quantity: 1, taxRateBps: 0),
+      ],
+      discountMinor: 1,
+    );
+    expect(result.subtotalMinor, 600);
+    expect(result.discountMinor, 1);
+    expect(result.totalMinor, 599);
+  });
 }

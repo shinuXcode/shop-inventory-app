@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sbill/core/database/app_database.dart';
+import 'package:sbill/core/billing/indian_gst.dart';
 
 void main() {
   late AppDatabase db;
@@ -60,8 +61,17 @@ void main() {
     expect(invoice!.customerId, 'customer-1');
     expect(invoice.discountMinor, 1000);
     expect(invoice.taxMinor, 6984);
+    expect(invoice.cgstMinor, 3492);
+    expect(invoice.sgstMinor, 3492);
+    expect(invoice.igstMinor, 0);
+    expect(invoice.gstSupplyType, 'intraState');
     expect(invoice.totalMinor, 45784);
     expect(invoice.paymentMethod, 'upi');
+    final gst = await db.gstSummaryBetween(DateTime(2026), DateTime(2027));
+    expect(gst.cgstMinor, 3492);
+    expect(gst.sgstMinor, 3492);
+    expect(gst.igstMinor, 0);
+    expect(gst.totalMinor, 6984);
     expect((await db.select(db.syncQueue).get()).length, 3);
   });
 
@@ -83,5 +93,97 @@ void main() {
     expect((await db.select(db.invoiceItems).get()), isEmpty);
     expect((await db.select(db.items).getSingle()).stockQuantity, 2);
     expect((await db.select(db.syncQueue).get()).length, 1);
+  });
+
+  test('stale cart cannot oversell stock after another checkout', () async {
+    final staleItem = await seedItem(stock: 10);
+
+    await db.checkout(
+      invoiceId: 'invoice-first',
+      invoiceNumber: 'INV-FIRST',
+      cart: [CartLine(id: 'line-first', item: staleItem, quantity: 7)],
+      discountMinor: 0,
+      paymentMethod: 'cash',
+    );
+
+    await expectLater(
+      db.checkout(
+        invoiceId: 'invoice-second',
+        invoiceNumber: 'INV-SECOND',
+        cart: [CartLine(id: 'line-second', item: staleItem, quantity: 7)],
+        discountMinor: 0,
+        paymentMethod: 'cash',
+      ),
+      throwsStateError,
+    );
+
+    expect((await db.select(db.items).getSingle()).stockQuantity, 3);
+    expect((await db.select(db.invoices).get()).length, 1);
+  });
+
+  test('concurrent checkouts cannot sell the same final unit twice', () async {
+    final item = await seedItem(stock: 1);
+
+    Future<bool> attempt(String suffix) async {
+      try {
+        await db.checkout(
+          invoiceId: 'invoice-$suffix',
+          invoiceNumber: 'INV-$suffix',
+          cart: [CartLine(id: 'line-$suffix', item: item, quantity: 1)],
+          discountMinor: 0,
+          paymentMethod: 'cash',
+        );
+        return true;
+      } on StateError {
+        return false;
+      }
+    }
+
+    final outcomes = await Future.wait([attempt('a'), attempt('b')]);
+    expect(outcomes.where((success) => success), hasLength(1));
+    expect((await db.select(db.items).getSingle()).stockQuantity, 0);
+    expect((await db.select(db.invoices).get()).length, 1);
+  });
+
+  test('inter-state checkout stores IGST instead of CGST and SGST', () async {
+    final item = await seedItem();
+    await db.checkout(
+      invoiceId: 'invoice-interstate',
+      invoiceNumber: 'INV-INTERSTATE',
+      cart: [CartLine(id: 'line-interstate', item: item, quantity: 1)],
+      discountMinor: 0,
+      paymentMethod: 'upi',
+      gstSupplyType: GstSupplyType.interState,
+    );
+
+    final invoice = await db.invoiceById('invoice-interstate');
+    expect(invoice, isNotNull);
+    expect(invoice!.gstSupplyType, 'interState');
+    expect(invoice.cgstMinor, 0);
+    expect(invoice.sgstMinor, 0);
+    expect(invoice.igstMinor, 3582);
+    final line = (await db.invoiceItemsFor(invoice.id)).single;
+    expect(line.igstMinor, 3582);
+    expect(line.cgstMinor, 0);
+    expect(line.sgstMinor, 0);
+  });
+
+  test('checkout rejects a stale cart after product price or GST changes', () async {
+    final staleItem = await seedItem();
+    await (db.update(db.items)..where((table) => table.id.equals(staleItem.id)))
+        .write(const ItemsCompanion(priceMinor: Value(21000)));
+
+    await expectLater(
+      db.checkout(
+        invoiceId: 'invoice-stale-price',
+        invoiceNumber: 'INV-STALE-PRICE',
+        cart: [CartLine(id: 'line-stale-price', item: staleItem, quantity: 1)],
+        discountMinor: 0,
+        paymentMethod: 'cash',
+      ),
+      throwsStateError,
+    );
+    expect(await db.select(db.invoices).get(), isEmpty);
+    expect((await db.select(db.items).getSingle()).stockQuantity, 10);
   });
 }

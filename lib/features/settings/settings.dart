@@ -26,6 +26,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final gst = TextEditingController();
   final prefix = TextEditingController();
   final invoiceFooter = TextEditingController();
+  final invoiceTitle = TextEditingController();
+  final invoiceTerms = TextEditingController();
+  bool showInvoiceLogo = true;
+  bool showSkuOnInvoice = true;
   bool thermal = false;
   bool dark = false;
   String currency = 'INR';
@@ -47,6 +51,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     gst.text = settings.gstNumber;
     prefix.text = settings.invoicePrefix;
     invoiceFooter.text = settings.invoiceFooter;
+    invoiceTitle.text = settings.invoiceTitle;
+    invoiceTerms.text = settings.invoiceTerms;
+    showInvoiceLogo = settings.showInvoiceLogo;
+    showSkuOnInvoice = settings.showSkuOnInvoice;
     thermal = settings.thermalReceipt;
     dark = settings.darkMode;
     currency = settings.currency;
@@ -65,6 +73,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       darkMode: dark,
       currency: currency,
       invoiceFooter: invoiceFooter.text.trim(),
+      invoiceTitle: invoiceTitle.text.trim(),
+      invoiceTerms: invoiceTerms.text.trim(),
+      showInvoiceLogo: showInvoiceLogo,
+      showSkuOnInvoice: showSkuOnInvoice,
     );
     await ref.read(themeModeProvider.notifier).setDarkMode(dark);
     if (_signedIn && settings.businessId != null) {
@@ -138,6 +150,39 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               hintText: 'Thank you for your business.',
               prefixIcon: Icon(Icons.notes_outlined),
             ),
+          ),
+          const SizedBox(height: 18),
+          Text('Invoice & receipt design', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 10),
+          TextField(
+            controller: invoiceTitle,
+            decoration: const InputDecoration(
+              labelText: 'Invoice heading',
+              hintText: 'TAX INVOICE',
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: invoiceTerms,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Terms & conditions',
+              hintText: 'Payment terms, return policy, warranty, etc.',
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Show SBILL logo on invoice'),
+            value: showInvoiceLogo,
+            onChanged: (value) => setState(() => showInvoiceLogo = value),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Show SKU column'),
+            value: showSkuOnInvoice,
+            onChanged: (value) => setState(() => showSkuOnInvoice = value),
           ),
           const SizedBox(height: 18),
           SwitchListTile(
@@ -228,6 +273,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     gst.dispose();
     prefix.dispose();
     invoiceFooter.dispose();
+    invoiceTitle.dispose();
+    invoiceTerms.dispose();
     super.dispose();
   }
 }

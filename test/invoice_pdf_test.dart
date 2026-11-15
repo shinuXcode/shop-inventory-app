@@ -12,6 +12,10 @@ void main() {
     subtotalMinor: 10000,
     discountMinor: 500,
     taxMinor: 1710,
+    cgstMinor: 855,
+    sgstMinor: 855,
+    igstMinor: 0,
+    gstSupplyType: 'intraState',
     totalMinor: 11210,
     paymentMethod: 'upi',
     status: 'completed',
@@ -28,7 +32,13 @@ void main() {
     itemId: 'item-pdf',
     itemNameSnapshot: 'USB Cable',
     skuSnapshot: 'USB001',
+    hsnSacSnapshot: null,
     quantity: 1,
+    unitCostMinor: 0,
+    lineDiscountMinor: 0,
+    cgstMinor: 855,
+    sgstMinor: 855,
+    igstMinor: 0,
     unitPriceMinor: 10000,
     taxRate: 18,
     taxMinor: 1710,
@@ -52,5 +62,45 @@ void main() {
       shopName: 'SBILL Shop',
     );
     expect(bytes.length, greaterThan(100));
+  });
+
+  test('long A4 invoices paginate and export a valid PDF', () async {
+    final manyItems = List.generate(120, (index) => InvoiceItem(
+      id: 'line-$index',
+      invoiceId: 'invoice-pdf',
+      itemId: 'item-$index',
+      itemNameSnapshot: 'Product $index',
+      skuSnapshot: 'SKU-$index',
+      hsnSacSnapshot: null,
+      quantity: 1,
+      unitCostMinor: 0,
+      lineDiscountMinor: 0,
+      cgstMinor: 900,
+      sgstMinor: 900,
+      igstMinor: 0,
+      unitPriceMinor: 10000,
+      taxRate: 18,
+      taxMinor: 1800,
+      lineTotalMinor: 11800,
+    ));
+    final bytes = await service.buildA4(
+      invoice: invoice(),
+      items: manyItems,
+      shopName: 'SBILL Shop',
+      footerText: 'Thank you - visit again.',
+    );
+    expect(bytes.length, greaterThan(5000));
+    expect(String.fromCharCodes(bytes.take(8)), startsWith('%PDF'));
+  });
+
+  test('unsupported complex-script text fails clearly instead of rendering corrupt glyphs', () async {
+    await expectLater(
+      service.buildA4(
+        invoice: invoice(),
+        items: [item()],
+        shopName: 'दुकान',
+      ),
+      throwsA(isA<UnsupportedError>()),
+    );
   });
 }
