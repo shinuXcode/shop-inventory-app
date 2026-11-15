@@ -111,7 +111,8 @@ alter table public.invoice_items add column if not exists line_discount_minor bi
 alter table public.invoices add column if not exists cgst_minor bigint not null default 0;
 alter table public.invoices add column if not exists sgst_minor bigint not null default 0;
 alter table public.invoices add column if not exists igst_minor bigint not null default 0;
-alter table public.invoices add column if not exists gst_supply_type text not null default 'intraState';
+alter table public.invoices add column if not exists gst_supply_type text not null default 'unknown';
+alter table public.invoices alter column gst_supply_type set default 'intraState';
 alter table public.invoice_items add column if not exists cgst_minor bigint not null default 0;
 alter table public.invoice_items add column if not exists sgst_minor bigint not null default 0;
 alter table public.invoice_items add column if not exists igst_minor bigint not null default 0;
