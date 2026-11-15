@@ -134,4 +134,55 @@ void main() {
       expect(jsonEncode(snapshot), isNotEmpty);
     });
   });
+
+    test('full backup restores products, customers, invoices and invoice lines', () async {
+      final source = AppDatabase.forTesting();
+      final target = AppDatabase.forTesting();
+      addTearDown(source.close);
+      addTearDown(target.close);
+      final now = DateTime(2026, 1, 1);
+
+      await source.into(source.items).insert(ItemsCompanion.insert(
+        id: 'restore-item',
+        name: 'Restore Item',
+        priceMinor: 12500,
+        stockQuantity: const Value(8),
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await source.into(source.customers).insert(CustomersCompanion.insert(
+        id: 'restore-customer',
+        name: 'Restore Customer',
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await source.into(source.invoices).insert(InvoicesCompanion.insert(
+        id: 'restore-invoice',
+        invoiceNumber: 'INV-RESTORE',
+        customerId: const Value('restore-customer'),
+        subtotalMinor: 12500,
+        totalMinor: 12500,
+        paymentMethod: 'cash',
+        createdAt: now,
+        updatedAt: now,
+      ));
+      await source.into(source.invoiceItems).insert(InvoiceItemsCompanion.insert(
+        id: 'restore-line',
+        invoiceId: 'restore-invoice',
+        itemId: 'restore-item',
+        itemNameSnapshot: 'Restore Item',
+        quantity: 1,
+        unitPriceMinor: 12500,
+        taxRate: 0,
+        taxMinor: 0,
+        lineTotalMinor: 12500,
+      ));
+
+      final restored = await target.importSnapshot(await source.exportSnapshot());
+      expect(restored, 4);
+      expect((await target.select(target.items).getSingle()).name, 'Restore Item');
+      expect((await target.select(target.customers).getSingle()).name, 'Restore Customer');
+      expect((await target.select(target.invoices).getSingle()).invoiceNumber, 'INV-RESTORE');
+      expect((await target.select(target.invoiceItems).getSingle()).itemNameSnapshot, 'Restore Item');
+    });
 }
