@@ -550,15 +550,15 @@ jobs:
             remove_alpha_ios: true
           YAML
           dart run flutter_launcher_icons -f flutter_launcher_icons_job.yaml
-      - run: flutter build ios --no-codesign --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+      - run: flutter build ios --simulator --no-codesign --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
       - uses: actions/upload-artifact@v4
         with:
-          name: sbill-ios-build
-          path: build/ios/iphoneos/
+          name: sbill-ios-simulator-build
+          path: build/ios/iphonesimulator/
       - name: Package iOS unsigned app
         shell: bash
         run: |
-          IOS_APP=$(find build/ios/iphoneos -maxdepth 1 -type d -name '*.app' | head -n 1)
+          IOS_APP=$(find build/ios/iphonesimulator -maxdepth 1 -type d -name '*.app' | head -n 1)
           test -n "$IOS_APP"
           ditto -c -k --sequesterRsrc --keepParent "$IOS_APP" sbill-ios-unsigned.zip
       - uses: actions/upload-artifact@v4
