@@ -5,9 +5,9 @@
 - Flutter/Dart with Material 3 and Riverpod.
 - Adaptive navigation for Dashboard, Billing, Inventory, Customers, Invoices, Purchases and Settings.
 - Drift/SQLite is the local source of truth.
-- Database schema version 3; versioned migrations preserve existing installations.
+- Database schema version 4; versioned migrations preserve existing installations.
 - Local tables: Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments and StockBatches.
-- Billing uses integer minor units and a transactional stock update.
+- Billing uses integer minor units, per-invoice intra-state CGST/SGST or inter-state IGST selection, and a transactional stock update. The supply type is currently selected manually; automatic place-of-supply determination from GSTIN/state codes remains future work.
 - Invoice lines retain historical item name, SKU, selling price, cost, discount, tax and line total snapshots.
 - PDF generation supports multi-page A4 and 80 mm thermal layouts, print/share/save, configurable heading/terms/footer/logo/SKU.
 - Optional Supabase Auth + PostgreSQL/RLS is available for the original business, item, customer and invoice sync entities.
