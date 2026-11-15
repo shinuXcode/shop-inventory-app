@@ -56,6 +56,13 @@ void main() {
     expect(await db.supplierOutstandingMinor('supplier-1'), 19500);
     expect((await db.recentPurchases()).single.paymentStatus, 'partial');
     expect((await db.expiringStock(withinDays: 120)), hasLength(1));
+    final restore = AppDatabase.forTesting();
+    addTearDown(restore.close);
+    await restore.importSnapshot(await db.exportSnapshot());
+    expect((await restore.getSuppliers()).single.name, 'Test Supplier');
+    expect((await restore.recentPurchases()).single.purchaseNumber, 'PUR-001');
+    expect((await restore.select(restore.purchaseItems).get()).single.quantity, 5);
+    expect((await restore.select(restore.stockBatches).get()).single.quantity, 5);
   });
 
   test('checkout reduces purchased expiry batches and snapshots cost for profit', () async {
