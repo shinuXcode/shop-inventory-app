@@ -9,7 +9,9 @@
 - [x] Stock adjustment audit records with negative-stock protection
 - [x] Expiry batches and expiry review
 - [x] Batch consumption on checkout and negative stock adjustments
-- [x] Invoice line cost and discount snapshots for historical gross-profit calculation
+- [x] Invoice line cost, discount and HSN/SAC snapshots for historical records
+- [x] HSN/SAC product editor, CSV import/export and A4 invoice display
+- [x] USB/Bluetooth HID keyboard-wedge barcode scanner workflow documented
 - [x] Configurable invoice heading, terms, footer, logo and SKU visibility
 - [x] Multi-page A4 and 80 mm thermal PDF layouts
 - [x] Currency-code rendering in PDFs to avoid missing rupee glyphs
