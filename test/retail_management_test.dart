@@ -199,6 +199,6 @@ void main() {
     expect(item.stockQuantity, 15);
     expect(item.costMinor, 4533);
     expect(await db.select(db.purchaseItems).get(), hasLength(2));
-    expect(await db.pendingSyncCount(), 1);
+    expect(await db.pendingSyncCount(), 3);
   });
 }

@@ -5,13 +5,13 @@
 - Flutter/Dart with Material 3 and Riverpod.
 - Adaptive navigation for Dashboard, Billing, Inventory, Customers, Invoices, Purchases and Settings.
 - Drift/SQLite is the local source of truth.
-- Database schema version 5; versioned migrations preserve existing installations.
-- Local tables: Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments and StockBatches.
+- Database schema version 6; versioned migrations add invoice payment state and auditable payment/return ledgers without dropping existing records.
+- Local tables: Items, Customers, Invoices, InvoiceItems, SyncQueue, Suppliers, Purchases, PurchaseItems, Expenses, StockAdjustments, StockBatches, CustomerPayments, SupplierPayments, SalesReturns and SalesReturnItems.
 - Billing uses integer minor units, per-invoice intra-state CGST/SGST or inter-state IGST selection, and a transactional stock update. The supply type is currently selected manually; automatic place-of-supply determination from GSTIN/state codes remains future work.
 - Invoice lines retain historical item name, SKU, selling price, cost, discount, tax and line total snapshots.
 - PDF generation supports multi-page A4 and 80 mm thermal layouts, print/share/save, configurable heading/terms/footer/logo/SKU.
-- Optional Supabase Auth + PostgreSQL/RLS is available for the original business, item, customer and invoice sync entities.
-- Supplier/purchase/expense/adjustment/expiry history is currently local-first and backup-restorable; it is not yet synchronized as separate cloud entities.
+- Optional Supabase Auth + PostgreSQL/RLS supports business, item, customer, invoice, supplier, purchase, expense, stock adjustment, expiry batch, payment ledger and sales return entities. Apply the updated supabase/schema.sql to the target Supabase project before enabling the extended sync paths.
+- SQLite remains authoritative for offline checkout; sync is still best-effort and requires staging validation with two real devices and separate tenant accounts.
 
 ## Retail domain workflows
 
@@ -24,6 +24,15 @@
 5. Conditionally decrement stock; abort the transaction if stock changed or is insufficient.
 6. Consume tracked expiry batches in earliest-expiry order.
 7. Enqueue item and invoice upserts.
+
+### Payments and sales returns
+
+- Invoice paid amount and payment status are stored separately from the original payment method.
+- Customer receipts are ledger rows tied to a customer and optionally an invoice; recording a receipt rejects overpayment and updates the invoice balance in one transaction.
+- Supplier payments are separate ledger rows tied to suppliers and optionally purchases; they update the purchase's paid amount and outstanding balance transactionally.
+- Return headers and return lines point back to original invoice lines. Returned quantities cannot exceed the original sold quantity minus earlier returns.
+- A return can restore quantity to stock inside the same transaction. Restocked goods are added as a fresh batch with no expiry date; staff must re-enter expiry information when it applies.
+- Returns reduce accounts-receivable balances. Refund method and value remain visible in the return ledger.
 
 ### Purchasing and inventory
 

@@ -68,8 +68,10 @@ void main() {
     );
 
     final events = await db.pendingSyncQueue();
+    expect(events.where((event) => event.entityType == 'supplier'), hasLength(1));
+    expect(events.where((event) => event.entityType == 'purchase'), hasLength(1));
     expect(events.where((event) => event.entityType == 'item'), hasLength(1));
-    expect(await db.pendingSyncCount(), 1);
+    expect(await db.pendingSyncCount(), 3);
     expect((await db.select(db.items).getSingle()).stockQuantity, 4);
   });
 }

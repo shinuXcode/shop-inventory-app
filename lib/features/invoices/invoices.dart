@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../../app.dart';
 import '../../core/pdf/invoice_pdf_service.dart';
 import '../../core/billing/money_formatter.dart';
@@ -86,6 +87,14 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
     final db = ref.read(databaseProvider);
     final items = await db.invoiceItemsFor(invoice.id);
     final customer = invoice.customerId == null ? null : await db.customerById(invoice.customerId!);
+    final payments = invoice.customerId == null
+        ? <CustomerPayment>[]
+        : (await db.customerPaymentsFor(invoice.customerId!))
+            .where((payment) => payment.invoiceId == invoice.id)
+            .toList();
+    final returns = await db.salesReturnsForInvoice(invoice.id);
+    final returnedMinor = returns.fold<int>(0, (sum, row) => sum + row.totalMinor);
+    final outstandingMinor = (invoice.totalMinor - invoice.paidMinor - returnedMinor).clamp(0, invoice.totalMinor).toInt();
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -143,15 +152,53 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                   if (invoice.igstMinor > 0) Text('IGST: ' + money(invoice.igstMinor)),
                   if (invoice.cgstMinor == 0 && invoice.sgstMinor == 0 && invoice.igstMinor == 0)
                     Text('GST / Tax: ' + money(invoice.taxMinor)),
-                  Text('Payment: ' + invoice.paymentMethod.toUpperCase()),
+                  Text('Payment: ' + invoice.paymentMethod.toUpperCase() + ' • ' + invoice.paymentStatus.toUpperCase()),
+                  Text('Paid: ' + money(invoice.paidMinor)),
+                  Text('Balance: ' + money(outstandingMinor)),
                   Text('Total: ' + money(invoice.totalMinor), style: const TextStyle(fontWeight: FontWeight.bold)),
                 ]),
               ),
+              if (payments.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('Payment history', style: Theme.of(context).textTheme.titleMedium),
+                ...payments.map((payment) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.payments_outlined),
+                  title: Text(money(payment.amountMinor)),
+                  subtitle: Text(
+                    '${payment.paymentMethod.toUpperCase()} • ${payment.receivedAt.toLocal()}'
+                    '${(payment.reference ?? '').isEmpty ? '' : ' • ${payment.reference}'}',
+                  ),
+                )),
+              ],
+              if (returns.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text('Sales returns', style: Theme.of(context).textTheme.titleMedium),
+                ...returns.map((returned) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.assignment_return_outlined),
+                  title: Text('${returned.returnNumber} • ${money(returned.totalMinor)}'),
+                  subtitle: Text('${returned.refundMethod.toUpperCase()} • ${returned.createdAt.toLocal()}'),
+                )),
+              ],
               const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  if (invoice.customerId != null && outstandingMinor > 0)
+                    FilledButton.tonalIcon(
+                      onPressed: () => _recordPayment(invoice),
+                      icon: const Icon(Icons.payments_outlined),
+                      label: const Text('Record payment'),
+                    ),
+                  FilledButton.tonalIcon(
+                    onPressed: () => _createReturn(invoice, items),
+                    icon: const Icon(Icons.assignment_return_outlined),
+                    label: const Text('Sales return'),
+                  ),
                   FilledButton.tonalIcon(
                     onPressed: () => _print(invoice, items, settings, customer: customer, thermal: settings.thermalReceipt),
                     icon: const Icon(Icons.print_outlined),
@@ -179,6 +226,208 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         ),
       ),
     );
+  }
+
+
+  Future<void> _recordPayment(Invoice invoice) async {
+    final priorReturns = await ref.read(databaseProvider).salesReturnsForInvoice(invoice.id);
+    final returnedMinor = priorReturns.fold<int>(0, (sum, row) => sum + row.totalMinor);
+    final outstandingMinor = (invoice.totalMinor - invoice.paidMinor - returnedMinor).clamp(0, invoice.totalMinor).toInt();
+    if (outstandingMinor <= 0) return;
+    final amount = TextEditingController();
+    String method = 'cash';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Record payment • ${invoice.invoiceNumber}'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Outstanding: ${money(outstandingMinor)}'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amount,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Amount received (INR)', prefixText: '₹ '),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: method,
+                  decoration: const InputDecoration(labelText: 'Payment method'),
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
+                    DropdownMenuItem(value: 'card', child: Text('Card')),
+                    DropdownMenuItem(value: 'bank', child: Text('Bank transfer')),
+                    DropdownMenuItem(value: 'cheque', child: Text('Cheque')),
+                  ],
+                  onChanged: (value) => setDialogState(() => method = value ?? 'cash'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Save receipt'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true) {
+      amount.dispose();
+      return;
+    }
+    final parsed = double.tryParse(amount.text.trim().replaceAll(',', ''));
+    amount.dispose();
+    if (parsed == null || !parsed.isFinite || parsed <= 0) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid payment amount.')),
+      );
+      return;
+    }
+    try {
+      await ref.read(databaseProvider).recordCustomerPayment(
+        id: const Uuid().v4(),
+        invoiceId: invoice.id,
+        amountMinor: (parsed * 100).round(),
+        paymentMethod: method,
+      );
+      refresh();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Customer payment recorded.')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingError(e, fallback: 'Payment could not be recorded.'))),
+      );
+    }
+  }
+
+  Future<void> _createReturn(Invoice invoice, List<InvoiceItem> invoiceLines) async {
+    if (invoiceLines.isEmpty) return;
+    final db = ref.read(databaseProvider);
+    final priorReturns = await (db.select(db.salesReturnItems)
+          ..where((t) => t.invoiceItemId.isIn(invoiceLines.map((x) => x.id).toList())))
+        .get();
+    final returned = <String, int>{};
+    for (final line in priorReturns) {
+      returned.update(
+        line.invoiceItemId,
+        (value) => value + line.quantity,
+        ifAbsent: () => line.quantity,
+      );
+    }
+    final quantities = <String, int>{};
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Return items • ${invoice.invoiceNumber}'),
+          content: SizedBox(
+            width: 520,
+            height: 360,
+            child: ListView.separated(
+              itemCount: invoiceLines.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, index) {
+                final line = invoiceLines[index];
+                final remaining = line.quantity - (returned[line.id] ?? 0);
+                if (remaining <= 0) {
+                  return ListTile(
+                    title: Text(line.itemNameSnapshot),
+                    subtitle: const Text('Fully returned'),
+                    trailing: const Icon(Icons.check_circle_outline),
+                  );
+                }
+                final selected = quantities[line.id] ?? 0;
+                return ListTile(
+                  title: Text(line.itemNameSnapshot),
+                  subtitle: Text('${remaining} remaining • ${money(line.unitPriceMinor)} each'),
+                  trailing: SizedBox(
+                    width: 112,
+                    child: DropdownButtonFormField<int>(
+                      initialValue: selected,
+                      decoration: const InputDecoration(labelText: 'Quantity', isDense: true),
+                      items: List.generate(
+                        remaining + 1,
+                        (value) => DropdownMenuItem(value: value, child: Text(value.toString())),
+                      ),
+                      onChanged: (value) => setDialogState(() => quantities[line.id] = value ?? 0),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: quantities.values.any((value) => value > 0)
+                  ? () => Navigator.pop(dialogContext, true)
+                  : null,
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != true) return;
+    String refundMethod = 'cash';
+    final refundConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Confirm refund'),
+          content: DropdownButtonFormField<String>(
+            initialValue: refundMethod,
+            decoration: const InputDecoration(labelText: 'Refund method'),
+            items: const [
+              DropdownMenuItem(value: 'cash', child: Text('Cash')),
+              DropdownMenuItem(value: 'upi', child: Text('UPI')),
+              DropdownMenuItem(value: 'card', child: Text('Card reversal')),
+              DropdownMenuItem(value: 'store_credit', child: Text('Store credit')),
+            ],
+            onChanged: (value) => setDialogState(() => refundMethod = value ?? 'cash'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Record return')),
+          ],
+        ),
+      ),
+    );
+    if (refundConfirmed != true) return;
+    final returnId = const Uuid().v4();
+    try {
+      await db.recordSalesReturn(
+        id: returnId,
+        returnNumber: 'RET-${DateTime.now().millisecondsSinceEpoch}',
+        invoiceId: invoice.id,
+        lines: quantities.entries
+            .where((entry) => entry.value > 0)
+            .map((entry) => SalesReturnLine(invoiceItemId: entry.key, quantity: entry.value))
+            .toList(),
+        refundMethod: refundMethod,
+      );
+      refresh();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sales return recorded and returned stock restored.')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingError(e, fallback: 'The sales return could not be recorded.'))),
+      );
+    }
   }
 
   Future<void> _print(Invoice invoice, List<InvoiceItem> items, AppSettings settings, {Customer? customer, bool thermal = false}) async {

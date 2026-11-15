@@ -1,58 +1,63 @@
 # SBILL Implementation Status
 
 **Updated:** 2026-11-15  
-**Working branch:** `feat/sbill-stability-update-foundation`  
-**Pull request:** [#5 — SBILL stability foundation](https://github.com/shinuXcode/shop-inventory-app/pull/5)
+**Integrated branch:** feat/sbill-one-phase-complete-system  
+**Base:** main after merge of PR #5  
+**Target version:** 1.3.0+4
 
-## Delivery order
+## Integrated implementation
 
-| Workstream | Status | Notes |
+This branch consolidates the outstanding source-code work into one coordinated change set. It does not split the product into staged implementation phases.
+
+| Area | Code status | Verification status |
 |---|---|---|
-| Initial repository audit | IMPLEMENTED | Static source audit committed; see `INITIAL_PRODUCT_AUDIT_2026-11-15.md` |
-| Backup merge correctness | IMPLEMENTED | Missing invoice/purchase child rows can be restored when the parent already exists |
-| Backup preview validity | IMPLEMENTED | Validation errors now make a preview invalid and are surfaced before import |
-| Backup structural validation | IMPLEMENTED | Checks backup sections, row objects, required identity fields, duplicate IDs and selected parent references before writing |
-| GST backup fidelity | IMPLEMENTED | Invoice-level CGST/SGST/IGST and supply type are included in exported snapshots |
-| Flutter tests / analyze | BLOCKED | GitHub Actions PR run is the active verification path; local Flutter SDK is unavailable in this session |
-| Android package identity | BLOCKED | Must inspect an existing distributed APK before preserving an established application ID |
-| Production signing | BLOCKED | Must establish whether a production keystore already exists; never rotate it without explicit approval |
-| Permanent Android project | NOT IMPLEMENTED | Android folder is absent from the repository; do not generate identity defaults blindly |
-| GitHub release pipeline | NOT IMPLEMENTED | Requires committed Android Gradle configuration and verified signing identity |
-| In-app updater | NOT IMPLEMENTED | Must be integrated after package identity, signing and release metadata are fixed |
-| Payment ledgers / returns | NOT IMPLEMENTED | Requires separately designed Drift migrations and historical compatibility tests |
-| Hardware, GST and cloud gaps | NOT IMPLEMENTED | Follow the audit priority order; no mock completion claims |
+| Backup/restore validation and merge correctness | Implemented in PR #5 | Earlier CI run passed |
+| Invoice payment state and customer receipt ledger | Implemented in this branch | New tests added; pending CI |
+| Supplier payment ledger | Implemented in this branch | New tests added; pending CI |
+| Sales returns and stock restoration | Implemented in this branch | New tests added; pending CI |
+| Schema migration | Drift schema v6 migration added | Historical database fixtures still required |
+| Backup/restore for payment and return records | Export, validation and import paths added | Round-trip regression test added; pending CI |
+| Supabase schema/RLS | New business-scoped tables and policies added | Must be applied and tested in staging |
+| Supabase sync | Push/pull handlers added for retail records, payments and returns | Two-device staging verification pending |
+| Invoice / purchase UI | Receipt, return and supplier payment actions added | Manual usability test pending |
+| Android production release | Manual fail-closed workflow added; requires identity, keystore and certificate inputs | Not run; no production key provided |
+| About > Check for updates | Opens GitHub Releases | Not an in-app downloader or installer |
+| Hardware, automatic GST, multilingual PDF | Existing documented limitations remain | Not implemented in this change |
 
-## Data-safety changes in this branch
+## Data and accounting rules
 
-1. `AppDatabase.importSnapshot` now validates the snapshot before entering the restore transaction.
-2. A backup with a malformed collection, non-object row, missing required identity, duplicate record ID, or broken invoice/purchase/supplier reference is rejected before writes.
-3. A merge restore no longer discards missing invoice lines merely because the invoice header already exists.
-4. A merge restore no longer discards missing purchase lines merely because the purchase header already exists.
-5. Backup exports preserve invoice-level GST breakup and supply type; older backups without these fields remain readable through existing import defaults.
-6. Invalid import previews now report validation failures as invalid, and the import path surfaces those errors rather than attempting restore.
+- All monetary values remain integer minor units (paise).
+- Invoice paid amount and payment status are stored separately from the initial payment method.
+- Non-credit invoices from existing schema versions are migrated as paid; credit invoices are migrated as unpaid.
+- New customer receipts cannot exceed the invoice balance after recorded returns.
+- Supplier payments cannot exceed the purchase's remaining balance.
+- Return quantities cannot exceed the original invoice-line quantity less previously returned quantities.
+- Return header, return lines, and optional stock restoration execute in one SQLite transaction.
+- Returned goods are introduced as a fresh non-expiry stock batch. Expiry must be checked/re-entered when relevant.
+- JSON backups include customer receipts, supplier payments, sales returns and return lines; the validator checks their parent references before writing.
 
-## Safety rules
+## Cloud sync
 
-- No database schema version change has been made in this first data-safety batch.
-- No existing records are deleted or overwritten by these changes.
-- No Android package ID or namespace has been guessed.
-- No keystore has been generated, replaced or committed.
-- No production APK or GitHub Release has been published.
-- No feature is marked TESTED or VERIFIED until the corresponding automated or device-level check actually passes.
+The updated Supabase schema adds business-scoped suppliers, purchases, purchase lines, expenses, stock adjustments, stock batches, customer payments, supplier payments, sales returns and return lines. RLS policies require business membership. Apply the complete updated supabase/schema.sql to a staging project before enabling these paths in production. SQLite remains the local source of truth.
 
-## Remaining Android setup required
+## Android release safety
 
-Before Android release implementation can be safely completed:
+The manual workflow requires:
+1. A verified full Android application ID from the existing app identity or a deliberate first production release decision.
+2. ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD configured as GitHub Actions secrets.
+3. The expected signing-certificate SHA-256 fingerprint supplied at workflow dispatch.
+4. A version/build number greater than the previous tagged release.
 
-1. Provide the latest APK previously installed by any SBILL users, if one has been distributed.
-2. Inspect its package ID and signing-certificate SHA-256 fingerprint.
-3. Confirm who controls the matching production keystore.
-4. Store the keystore and passwords in GitHub Actions secrets; retain a verified offline backup.
-5. Commit deterministic Android Gradle/manifest configuration with the verified application ID.
-6. Add release signing, artifact verification, monotonic version-code enforcement, release metadata and GitHub Release publication.
-7. Implement update download/hash verification and Android package-installer handoff.
-8. Perform a real over-install test with existing business data on a test device.
+The workflow generates Android project files from the supplied application ID, builds the APK, signs it, checks the application ID and exact certificate fingerprint, computes SHA-256, and publishes sbill.apk plus latest.json. It does not invent or generate a signing key. No production APK has been published from this branch.
 
-## Verification policy
+## Remaining real-world gates
 
-A successful CI run proves only the jobs it actually ran. It does not prove that a release can update an existing installation, that signing continuity is preserved, or that data survives on a physical device. Those remain separate release gates.
+- CI run for the integrated branch must pass; no claims of green tests/analyze/build are made until that run completes.
+- Apply and validate the Supabase SQL in staging; run cross-tenant RLS and two-device sync tests.
+- Verify old database migration with real fixtures from schema versions 1–5.
+- Test signed APK over-install and data preservation on a physical Android device.
+- Add an actual in-app download/checksum/install experience if automatic updates are required.
+- Implement camera scanning, direct ESC/POS printing, Devanagari font embedding and GST place-of-supply automation.
+- Perform operator testing for returns, payments, refunds, statements and reconciliation.
+
+**Release decision:** NO-GO for a production rollout until the integrated CI run, signing identity, migration fixtures, Supabase staging and physical-device upgrade tests are verified.
