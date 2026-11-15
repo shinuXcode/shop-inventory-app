@@ -645,6 +645,12 @@ class AppDatabase extends _$AppDatabase {
     return result;
   }
 
+  Future<List<StockAdjustment>> recentStockAdjustments({int limit = 100}) =>
+      (select(stockAdjustments)
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+            ..limit(limit))
+          .get();
+
   Future<List<Expense>> recentExpenses({int limit = 50}) =>
       (select(expenses)
             ..orderBy([(t) => OrderingTerm.desc(t.incurredAt)])
