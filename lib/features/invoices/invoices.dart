@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../app.dart';
 import '../../core/pdf/invoice_pdf_service.dart';
+import '../../core/billing/money_formatter.dart';
 import '../../core/settings/app_settings.dart';
 import '../../core/database/app_database.dart';
 import '../../core/widgets/user_facing_error.dart';
@@ -15,16 +16,24 @@ class InvoicesPage extends ConsumerStatefulWidget {
 class _InvoicesPageState extends ConsumerState<InvoicesPage> {
   late Future<List<Invoice>> future;
   final pdf = InvoicePdfService();
+  String currencyCode = 'INR';
 
   @override
   void initState() {
     super.initState();
     future = ref.read(databaseProvider).recentInvoices(limit: 100);
+    _loadCurrency();
+  }
+
+  Future<void> _loadCurrency() async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = AppSettings(prefs).currency;
+    if (mounted) setState(() => currencyCode = code);
   }
 
   void refresh() => setState(() => future = ref.read(databaseProvider).recentInvoices(limit: 100));
 
-  String money(int minor) => '₹' + (minor / 100).toStringAsFixed(2);
+  String money(int minor) => MoneyFormatter.format(minor, currencyCode: currencyCode);
 
   @override
   Widget build(BuildContext context) => Scaffold(
