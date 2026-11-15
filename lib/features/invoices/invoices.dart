@@ -153,22 +153,22 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                 runSpacing: 8,
                 children: [
                   FilledButton.tonalIcon(
-                    onPressed: () => _print(invoice, items, settings, thermal: settings.thermalReceipt),
+                    onPressed: () => _print(invoice, items, settings, customer: customer, thermal: settings.thermalReceipt),
                     icon: const Icon(Icons.print_outlined),
                     label: Text(settings.thermalReceipt ? 'Print Thermal (default)' : 'Print A4 (default)'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => _print(invoice, items, settings, thermal: !settings.thermalReceipt),
+                    onPressed: () => _print(invoice, items, settings, customer: customer, thermal: !settings.thermalReceipt),
                     icon: const Icon(Icons.receipt_long_outlined),
                     label: Text(settings.thermalReceipt ? 'Print A4' : 'Print Thermal'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => _share(invoice, items, settings),
+                    onPressed: () => _share(invoice, items, settings, customer: customer),
                     icon: const Icon(Icons.share_outlined),
                     label: const Text('Share PDF'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => _save(invoice, items, settings),
+                    onPressed: () => _save(invoice, items, settings, customer: customer),
                     icon: const Icon(Icons.save_outlined),
                     label: const Text('Save PDF'),
                   ),
@@ -181,7 +181,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
     );
   }
 
-  Future<void> _print(Invoice invoice, List<InvoiceItem> items, AppSettings settings, {bool thermal = false}) async {
+  Future<void> _print(Invoice invoice, List<InvoiceItem> items, AppSettings settings, {Customer? customer, bool thermal = false}) async {
     try {
       await pdf.printInvoice(
         invoice: invoice,
@@ -190,6 +190,10 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
         shopAddress: settings.businessAddress,
         phone: settings.businessPhone,
         gstNumber: settings.gstNumber,
+        customerName: customer?.name,
+        customerPhone: customer?.phone,
+        customerEmail: customer?.email,
+        customerAddress: customer?.address,
         footerText: settings.invoiceFooter,
         invoiceTitle: settings.invoiceTitle,
         termsText: settings.invoiceTerms,
@@ -206,7 +210,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
     }
   }
 
-  Future<void> _share(Invoice invoice, List<InvoiceItem> items, AppSettings settings) async {
+  Future<void> _share(Invoice invoice, List<InvoiceItem> items, AppSettings settings, {Customer? customer}) async {
     try {
       await pdf.shareInvoice(
         invoice: invoice,
@@ -231,7 +235,7 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
     }
   }
 
-  Future<void> _save(Invoice invoice, List<InvoiceItem> items, AppSettings settings) async {
+  Future<void> _save(Invoice invoice, List<InvoiceItem> items, AppSettings settings, {Customer? customer}) async {
     try {
       final file = await pdf.saveInvoice(
         invoice: invoice,
