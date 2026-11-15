@@ -421,7 +421,7 @@ class AppDatabase extends _$AppDatabase {
         if (item == null) {
           throw StateError('A purchased product no longer exists.');
         }
-        currentItems[line.itemId] = item;
+        currentItems[itemId] = item;
       }
 
       final totals = const BillingCalculator().calculate(
