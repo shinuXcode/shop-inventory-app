@@ -14,7 +14,7 @@ class AboutPage extends StatelessWidget {
   static const portfolio = 'https://sadab01.vercel.app/';
   static const github = 'https://github.com/shinuXcode/shop-inventory-app';
   static const version = '1.2.0';
-  static const build = '3';
+  static const buildNumber = '3';
 
   Future<void> _open(BuildContext context, String url) async {
     try {
