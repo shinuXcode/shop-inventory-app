@@ -45,7 +45,7 @@ class DashboardPage extends ConsumerWidget {
       body: dashboard.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(
-          child: Text('Dashboard data is temporarily unavailable. Please try again.),
+          child: Text('Dashboard data is temporarily unavailable. Please try again.'),
         ),
         data: (data) {
           final invoices = data.invoices;
