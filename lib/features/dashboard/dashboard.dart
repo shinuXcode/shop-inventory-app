@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../app.dart';
 import '../../core/database/app_database.dart';
+import '../../core/billing/money_formatter.dart';
 import '../shell/shell.dart';
 
 final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) async {
@@ -12,16 +13,30 @@ final dashboardDataProvider = FutureProvider.autoDispose<DashboardData>((ref) as
   final lowStock = await db.lowStockCount();
   final topSellers = await db.topSellingItems(limit: 5);
   final creditOutstanding = await db.creditOutstandingMinor();
-  return DashboardData(invoices: invoices, lowStock: lowStock, topSellers: topSellers, creditOutstanding: creditOutstanding);
+  final now = DateTime.now();
+  final start = DateTime(now.year, now.month, now.day);
+  final end = start.add(const Duration(days: 1));
+  final grossProfit = await db.grossProfitBetween(start, end);
+  final expenses = await db.expensesBetween(start, end);
+  return DashboardData(
+    invoices: invoices,
+    lowStock: lowStock,
+    topSellers: topSellers,
+    creditOutstanding: creditOutstanding,
+    grossProfit: grossProfit,
+    expenses: expenses,
+  );
 });
 
 class DashboardData {
-  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers, required this.creditOutstanding});
+  const DashboardData({required this.invoices, required this.lowStock, required this.topSellers, required this.creditOutstanding, required this.grossProfit, required this.expenses});
 
   final List<Invoice> invoices;
   final int lowStock;
   final List<TopSellingItem> topSellers;
   final int creditOutstanding;
+  final int grossProfit;
+  final int expenses;
 }
 
 class DashboardPage extends ConsumerWidget {
@@ -91,7 +106,7 @@ class DashboardPage extends ConsumerWidget {
                       _metric(
                         context,
                         'Today’s sales',
-                        '₹' + (sales / 100).toStringAsFixed(2),
+                        MoneyFormatter.format(sales),
                         Icons.currency_rupee_outlined,
                       ),
                       _metric(
@@ -104,8 +119,8 @@ class DashboardPage extends ConsumerWidget {
                         context,
                         'Average bill',
                         today.isEmpty
-                            ? '₹0.00'
-                            : '₹' + (sales / 100 / today.length).toStringAsFixed(2),
+                            ? MoneyFormatter.format(0)
+                            : MoneyFormatter.format((sales / today.length).round()),
                         Icons.trending_up_outlined,
                       ),
                       _metric(
@@ -117,8 +132,20 @@ class DashboardPage extends ConsumerWidget {
                       _metric(
                         context,
                         'Credit outstanding',
-                        '₹' + (data.creditOutstanding / 100).toStringAsFixed(2),
+                        MoneyFormatter.format(data.creditOutstanding),
                         Icons.account_balance_wallet_outlined,
+                      ),
+                      _metric(
+                        context,
+                        'Gross profit (tracked)',
+                        MoneyFormatter.format(data.grossProfit),
+                        Icons.trending_up_outlined,
+                      ),
+                      _metric(
+                        context,
+                        'Expenses today',
+                        MoneyFormatter.format(data.expenses),
+                        Icons.receipt_outlined,
                       ),
                     ],
                   );
@@ -183,7 +210,162 @@ class DashboardPage extends ConsumerWidget {
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     Text(
-                                      '₹' + (value / 100).toStringAsFixed(0),
+                                      MoneyFormatter.format(value).replaceAll(RegExp(r'\\.00,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    FractionallySizedBox(
+                                      widthFactor: 0.8,
+                                      child: Container(
+                                        height: 95 * factor + 4,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(8),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primaryContainer,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      DateFormat('EEE').format(date),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Top sellers', style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 10),
+                      if (data.topSellers.isEmpty)
+                        const Text('No sales data yet.')
+                      else
+                        ...data.topSellers.asMap().entries.map((entry) {
+                          final seller = entry.value;
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: CircleAvatar(child: Text((entry.key + 1).toString())),
+                            title: Text(
+                              seller.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              seller.quantity % 1 == 0
+                                  ? seller.quantity.toStringAsFixed(0) + ' sold'
+                                  : seller.quantity.toStringAsFixed(2) + ' sold',
+                            ),
+                            trailing: Text(
+                              '₹' + (seller.totalMinor / 100).toStringAsFixed(2),
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          );
+                        }),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Recent invoices',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 10),
+              ...invoices.take(8).map(
+                (x) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: Text(x.invoiceNumber),
+                    subtitle: Text(x.createdAt.toLocal().toString()),
+                    trailing: Text(
+                      '₹' + (x.totalMinor / 100).toStringAsFixed(2),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _quickAction(
+    BuildContext context,
+    String label,
+    IconData icon,
+    int destination,
+  ) =>
+      FilledButton.tonalIcon(
+        onPressed: () => Shell.navigateTo(context, destination),
+        icon: Icon(icon),
+        label: Text(label),
+      );
+
+  Widget _metric(
+    BuildContext context,
+    String title,
+    String value,
+    IconData icon,
+  ) =>
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+), ''),
                                       style: Theme.of(context)
                                           .textTheme
                                           .labelSmall,
