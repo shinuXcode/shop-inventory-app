@@ -1230,7 +1230,9 @@ class AppDatabase extends _$AppDatabase {
       for (final row in invoiceItemRows) {
         final id = row['id'].toString();
         final invoiceId = row['invoiceId'].toString();
-        if (existingInvoiceItemIds.contains(id) || !importedInvoiceIds.contains(invoiceId)) continue;
+        if (existingInvoiceItemIds.contains(id) ||
+            !(existingInvoiceIds.contains(invoiceId) ||
+              importedInvoiceIds.contains(invoiceId))) continue;
         await into(invoiceItems).insert(InvoiceItemsCompanion(
           id: Value(id),
           invoiceId: Value(invoiceId),
@@ -1295,7 +1297,8 @@ class AppDatabase extends _$AppDatabase {
         final id = row['id'].toString();
         final purchaseId = row['purchaseId'].toString();
         if (existingPurchaseItemIds.contains(id) ||
-            !importedPurchaseIds.contains(purchaseId)) continue;
+            !(existingPurchaseIds.contains(purchaseId) ||
+              importedPurchaseIds.contains(purchaseId))) continue;
         await into(purchaseItems).insert(PurchaseItemsCompanion.insert(
           id: id,
           purchaseId: purchaseId,
