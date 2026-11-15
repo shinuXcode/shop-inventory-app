@@ -346,7 +346,7 @@ class SyncService {
       cgstMinor: Value((row['cgst_minor'] as num?)?.toInt() ?? 0),
       sgstMinor: Value((row['sgst_minor'] as num?)?.toInt() ?? 0),
       igstMinor: Value((row['igst_minor'] as num?)?.toInt() ?? 0),
-      gstSupplyType: Value(row['gst_supply_type']?.toString() ?? 'intraState'),
+      gstSupplyType: Value(row['gst_supply_type']?.toString() ?? 'unknown'),
       totalMinor: Value((row['total_minor'] as num?)?.toInt() ?? 0),
       paymentMethod: Value(row['payment_method'].toString()),
       status: Value(row['status']?.toString() ?? 'completed'),
