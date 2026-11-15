@@ -126,11 +126,15 @@ class _BillingPageState extends ConsumerState<BillingPage> {
   );
 
   GstInvoiceResult _gstTotals(List<CartLine> cart) {
-    if (cart.isEmpty) {
-      return const GstInvoiceResult(
-        subtotalMinor: 0,
+    final subtotal = cart.fold<int>(
+      0,
+      (sum, line) => sum + line.item.priceMinor * line.quantity,
+    );
+    if (cart.isEmpty || _discountMinor > subtotal) {
+      return GstInvoiceResult(
+        subtotalMinor: subtotal,
         discountMinor: 0,
-        taxableMinor: 0,
+        taxableMinor: subtotal,
         cgstMinor: 0,
         sgstMinor: 0,
         igstMinor: 0,
