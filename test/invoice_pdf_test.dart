@@ -53,4 +53,27 @@ void main() {
     );
     expect(bytes.length, greaterThan(100));
   });
+
+  test('long A4 invoices paginate and export a valid PDF', () async {
+    final manyItems = List.generate(120, (index) => InvoiceItem(
+      id: 'line-$index',
+      invoiceId: 'invoice-pdf',
+      itemId: 'item-$index',
+      itemNameSnapshot: 'Product $index',
+      skuSnapshot: 'SKU-$index',
+      quantity: 1,
+      unitPriceMinor: 10000,
+      taxRate: 18,
+      taxMinor: 1800,
+      lineTotalMinor: 11800,
+    ));
+    final bytes = await service.buildA4(
+      invoice: invoice(),
+      items: manyItems,
+      shopName: 'SBILL Shop',
+      footerText: 'Thank you - visit again.',
+    );
+    expect(bytes.length, greaterThan(5000));
+    expect(String.fromCharCodes(bytes.take(8)), startsWith('%PDF'));
+  });
 }
