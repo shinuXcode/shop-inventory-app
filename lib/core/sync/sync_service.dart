@@ -124,6 +124,9 @@ class SyncService {
   }
 
   Future<void> _push(SyncQueueData event, String businessId, SupabaseClient client) async {
+    if (event.operation != 'upsert') {
+      throw StateError('Unsupported sync operation: ${event.operation}');
+    }
     switch (event.entityType) {
       case 'item':
         final item = await (db.select(db.items)..where((t) => t.id.equals(event.entityId))).getSingleOrNull();
@@ -213,27 +216,50 @@ class SyncService {
         break;
 
       default:
-        break;
+        // Never acknowledge an event that this client does not understand.
+        throw StateError('Unsupported sync entity type: ${event.entityType}');
     }
   }
 
+  Future<List<Map<String, dynamic>>> _fetchAllBusinessRows(
+    SupabaseClient client,
+    String table,
+    String businessId,
+  ) async {
+    const pageSize = 500;
+    var offset = 0;
+    final rows = <Map<String, dynamic>>[];
+    while (true) {
+      final page = await client
+          .from(table)
+          .select()
+          .eq('business_id', businessId)
+          .range(offset, offset + pageSize - 1);
+      final batch = List<Map<String, dynamic>>.from(page);
+      rows.addAll(batch);
+      if (batch.length < pageSize) break;
+      offset += pageSize;
+    }
+    return rows;
+  }
+
   Future<void> _pullLatest(String businessId, SupabaseClient client) async {
-    final itemRows = await client.from('items').select().eq('business_id', businessId);
+    final itemRows = await _fetchAllBusinessRows(client, 'items', businessId);
     for (final row in itemRows) {
       await _applyRemoteItem(row);
     }
 
-    final customerRows = await client.from('customers').select().eq('business_id', businessId);
+    final customerRows = await _fetchAllBusinessRows(client, 'customers', businessId);
     for (final row in customerRows) {
       await _applyRemoteCustomer(row);
     }
 
-    final invoiceRows = await client.from('invoices').select().eq('business_id', businessId);
+    final invoiceRows = await _fetchAllBusinessRows(client, 'invoices', businessId);
     for (final row in invoiceRows) {
       await _applyRemoteInvoice(row);
     }
 
-    final invoiceItemRows = await client.from('invoice_items').select().eq('business_id', businessId);
+    final invoiceItemRows = await _fetchAllBusinessRows(client, 'invoice_items', businessId);
     for (final row in invoiceItemRows) {
       await _applyRemoteInvoiceItem(row);
     }
