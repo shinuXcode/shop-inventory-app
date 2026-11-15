@@ -25,7 +25,7 @@ class ImportPreview {
   final String? error;
   final List<String> validationErrors;
 
-  bool get isValid => error == null;
+  bool get isValid => error == null && validationErrors.isEmpty;
   String get label => switch (kind) {
     'backup' => 'SBILL backup',
     'products' => 'Products',
@@ -40,7 +40,7 @@ class DataTransferService {
       type: FileType.custom,
       allowedExtensions: ['csv', 'json', 'txt'],
     );
-    if (pickedFiles == null || pickedFiles.isEmpty) return null;
+    if (pickedFiles.isEmpty) return null;
     final picked = pickedFiles.first;
     final bytes = await picked.readAsBytes();
     return parseFile(picked.name, bytes);
@@ -151,9 +151,12 @@ class DataTransferService {
   }
 
   static Future<int> importPreview(AppDatabase db, ImportPreview preview) async {
-    if (!preview.isValid) throw StateError(preview.error ?? 'Invalid import');
+    if (preview.error != null) throw StateError(preview.error!);
     if (preview.validationErrors.isNotEmpty) {
-      throw StateError('Please fix the validation errors shown in the preview before importing.');
+      throw StateError(
+        'Please fix the validation errors shown in the preview before importing: '
+        '${preview.validationErrors.join(' ')}',
+      );
     }
     if (preview.kind == 'backup' && preview.snapshot != null) {
       return db.importSnapshot(preview.snapshot!);
@@ -254,7 +257,9 @@ class DataTransferService {
         final taxText = _rowValue(row, const ['tax', 'tax_rate', 'gst']);
         final stockText = _rowValue(row, const ['stock', 'quantity', 'stock_quantity']);
         final price = double.tryParse(priceText.replaceAll(RegExp(r'[^0-9.\-]'), ''));
-        final tax = double.tryParse(taxText.replaceAll(RegExp(r'[^0-9.\-]'), ''));
+        final tax = taxText.isEmpty
+            ? 0.0
+            : double.tryParse(taxText.replaceAll(RegExp(r'[^0-9.\-]'), ''));
         final stock = int.tryParse(stockText.isEmpty ? '0' : stockText);
         if (price == null || !price.isFinite || price < 0) errors.add('Row ' + number.toString() + ': price must be a valid non-negative number.');
         if (tax == null || !tax.isFinite || tax < 0 || tax > 100) errors.add('Row ' + number.toString() + ': tax must be between 0 and 100%.');
@@ -267,22 +272,8 @@ class DataTransferService {
     return errors;
   }
 
-  static List<String> _validateBackup(Map<String, dynamic> snapshot) {
-    final errors = <String>[];
-    final items = (snapshot['items'] as List?)?.whereType<Map>().toList() ?? const [];
-    final customers = (snapshot['customers'] as List?)?.whereType<Map>().toList() ?? const [];
-    for (var i = 0; i < items.length; i++) {
-      if ((items[i]['id']?.toString().trim() ?? '').isEmpty || (items[i]['name']?.toString().trim() ?? '').isEmpty) {
-        errors.add('Backup product row ' + (i + 1).toString() + ': required identity is missing.');
-      }
-    }
-    for (var i = 0; i < customers.length; i++) {
-      if ((customers[i]['id']?.toString().trim() ?? '').isEmpty || (customers[i]['name']?.toString().trim() ?? '').isEmpty) {
-        errors.add('Backup customer row ' + (i + 1).toString() + ': required identity is missing.');
-      }
-    }
-    return errors;
-  }
+  static List<String> _validateBackup(Map<String, dynamic> snapshot) =>
+      AppDatabase.validateBackupSnapshot(snapshot);
 
   static String _rowValue(Map<String, String> row, List<String> keys) {
     for (final key in keys) {

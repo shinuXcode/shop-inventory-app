@@ -161,7 +161,11 @@ void main() {
         invoiceNumber: 'INV-RESTORE',
         customerId: const Value('restore-customer'),
         subtotalMinor: 12500,
-        totalMinor: 12500,
+        taxMinor: const Value(1800),
+        cgstMinor: const Value(900),
+        sgstMinor: const Value(900),
+        gstSupplyType: const Value('intraState'),
+        totalMinor: 14300,
         paymentMethod: 'cash',
         createdAt: now,
         updatedAt: now,
@@ -182,7 +186,184 @@ void main() {
       expect(restored, 4);
       expect((await target.select(target.items).getSingle()).name, 'Restore Item');
       expect((await target.select(target.customers).getSingle()).name, 'Restore Customer');
-      expect((await target.select(target.invoices).getSingle()).invoiceNumber, 'INV-RESTORE');
+      final restoredInvoice = await target.select(target.invoices).getSingle();
+      expect(restoredInvoice.invoiceNumber, 'INV-RESTORE');
+      expect(restoredInvoice.cgstMinor, 900);
+      expect(restoredInvoice.sgstMinor, 900);
+      expect(restoredInvoice.igstMinor, 0);
+      expect(restoredInvoice.gstSupplyType, 'intraState');
       expect((await target.select(target.invoiceItems).getSingle()).itemNameSnapshot, 'Restore Item');
     });
+
+  test('backup restore imports missing invoice lines when invoice already exists', () async {
+    final source = AppDatabase.forTesting();
+    final target = AppDatabase.forTesting();
+    addTearDown(source.close);
+    addTearDown(target.close);
+    final now = DateTime(2026, 2, 1);
+
+    await source.into(source.items).insert(ItemsCompanion.insert(
+      id: 'merge-item',
+      name: 'Merge Item',
+      priceMinor: 2500,
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await source.into(source.invoices).insert(InvoicesCompanion.insert(
+      id: 'merge-invoice',
+      invoiceNumber: 'INV-MERGE',
+      subtotalMinor: 2500,
+      totalMinor: 2500,
+      paymentMethod: 'cash',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await source.into(source.invoiceItems).insert(InvoiceItemsCompanion.insert(
+      id: 'merge-line',
+      invoiceId: 'merge-invoice',
+      itemId: 'merge-item',
+      itemNameSnapshot: 'Merge Item',
+      quantity: 1,
+      unitPriceMinor: 2500,
+      taxRate: 0,
+      taxMinor: 0,
+      lineTotalMinor: 2500,
+    ));
+
+    await target.into(target.items).insert(ItemsCompanion.insert(
+      id: 'merge-item',
+      name: 'Merge Item',
+      priceMinor: 2500,
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await target.into(target.invoices).insert(InvoicesCompanion.insert(
+      id: 'merge-invoice',
+      invoiceNumber: 'INV-MERGE',
+      subtotalMinor: 2500,
+      totalMinor: 2500,
+      paymentMethod: 'cash',
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final imported = await target.importSnapshot(await source.exportSnapshot());
+
+    expect(imported, 1);
+    final lines = await target.invoiceItemsFor('merge-invoice');
+    expect(lines, hasLength(1));
+    expect(lines.single.id, 'merge-line');
+    expect(lines.single.itemNameSnapshot, 'Merge Item');
+  });
+
+
+  test('invalid backup rows are not marked valid and cannot be restored', () async {
+    final db = AppDatabase.forTesting();
+    addTearDown(db.close);
+    final preview = DataTransferService.parseFile(
+      'invalid-backup.json',
+      utf8.encode(jsonEncode({
+        'format': 'sbill-backup-v1',
+        'items': [
+          {'name': 'Missing identity'},
+        ],
+      })),
+    );
+
+    expect(preview.isValid, isFalse);
+    expect(preview.validationErrors, isNotEmpty);
+    await expectLater(
+      DataTransferService.importPreview(db, preview),
+      throwsA(isA<StateError>()),
+    );
+    expect(await db.select(db.items).get(), isEmpty);
+  });
+
+
+  test('backup restore imports missing purchase lines when purchase already exists', () async {
+    final source = AppDatabase.forTesting();
+    final target = AppDatabase.forTesting();
+    addTearDown(source.close);
+    addTearDown(target.close);
+    final now = DateTime(2026, 2, 2);
+
+    await source.into(source.suppliers).insert(SuppliersCompanion.insert(
+      id: 'merge-supplier',
+      name: 'Merge Supplier',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await source.into(source.purchases).insert(PurchasesCompanion.insert(
+      id: 'merge-purchase',
+      purchaseNumber: 'PUR-MERGE',
+      supplierId: 'merge-supplier',
+      subtotalMinor: 3000,
+      totalMinor: 3000,
+      createdAt: now,
+    ));
+    await source.into(source.purchaseItems).insert(PurchaseItemsCompanion.insert(
+      id: 'merge-purchase-line',
+      purchaseId: 'merge-purchase',
+      itemId: 'merge-item',
+      itemNameSnapshot: 'Merge Item',
+      quantity: 1,
+      unitCostMinor: 3000,
+      taxRate: 0,
+      taxMinor: 0,
+      lineTotalMinor: 3000,
+    ));
+
+    await target.into(target.suppliers).insert(SuppliersCompanion.insert(
+      id: 'merge-supplier',
+      name: 'Merge Supplier',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await target.into(target.purchases).insert(PurchasesCompanion.insert(
+      id: 'merge-purchase',
+      purchaseNumber: 'PUR-MERGE',
+      supplierId: 'merge-supplier',
+      subtotalMinor: 3000,
+      totalMinor: 3000,
+      createdAt: now,
+    ));
+
+    final imported = await target.importSnapshot(await source.exportSnapshot());
+
+    expect(imported, 1);
+    final lines = await (target.select(target.purchaseItems)
+          ..where((row) => row.purchaseId.equals('merge-purchase')))
+        .get();
+    expect(lines, hasLength(1));
+    expect(lines.single.id, 'merge-purchase-line');
+  });
+
+
+  test('restore rejects backup rows with broken parent references before writing', () async {
+    final db = AppDatabase.forTesting();
+    addTearDown(db.close);
+    final invalidSnapshot = <String, dynamic>{
+      'format': 'sbill-backup-v1',
+      'items': [
+        {'id': 'orphan-item', 'name': 'Orphan Item'},
+      ],
+      'invoiceItems': [
+        {
+          'id': 'orphan-line',
+          'invoiceId': 'missing-invoice',
+          'itemId': 'orphan-item',
+          'itemNameSnapshot': 'Orphan Item',
+        },
+      ],
+    };
+
+    expect(AppDatabase.validateBackupSnapshot(invalidSnapshot), isNotEmpty);
+    await expectLater(
+      db.importSnapshot(invalidSnapshot),
+      throwsA(isA<ArgumentError>()),
+    );
+    expect(await db.select(db.items).get(), isEmpty);
+    expect(await db.select(db.invoiceItems).get(), isEmpty);
+  });
+
 }

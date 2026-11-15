@@ -944,7 +944,9 @@ class AppDatabase extends _$AppDatabase {
       'invoices': invoiceRows.map((x) => {
         'id': x.id, 'invoiceNumber': x.invoiceNumber, 'customerId': x.customerId,
         'subtotalMinor': x.subtotalMinor, 'discountMinor': x.discountMinor,
-        'taxMinor': x.taxMinor, 'totalMinor': x.totalMinor, 'paymentMethod': x.paymentMethod,
+        'taxMinor': x.taxMinor, 'cgstMinor': x.cgstMinor, 'sgstMinor': x.sgstMinor,
+        'igstMinor': x.igstMinor, 'gstSupplyType': x.gstSupplyType,
+        'totalMinor': x.totalMinor, 'paymentMethod': x.paymentMethod,
         'status': x.status, 'notes': x.notes,
         'createdAt': x.createdAt.toIso8601String(), 'updatedAt': x.updatedAt.toIso8601String(),
       }).toList(),
@@ -1123,9 +1125,112 @@ class AppDatabase extends _$AppDatabase {
     return imported;
   }
 
+  static List<String> validateBackupSnapshot(Map<String, dynamic> snapshot) {
+    final errors = <String>[];
+    const collectionKeys = [
+      'items',
+      'customers',
+      'invoices',
+      'invoiceItems',
+      'suppliers',
+      'purchases',
+      'purchaseItems',
+      'expenses',
+      'stockAdjustments',
+      'stockBatches',
+    ];
+    final collections = <String, List<Map>>{};
+
+    for (final key in collectionKeys) {
+      final value = snapshot[key];
+      if (value == null) {
+        collections[key] = <Map>[];
+        continue;
+      }
+      if (value is! List) {
+        errors.add('Backup section "$key" must be a list.');
+        collections[key] = <Map>[];
+        continue;
+      }
+      final rows = <Map>[];
+      for (var index = 0; index < value.length; index++) {
+        final row = value[index];
+        if (row is! Map) {
+          errors.add('Backup section "$key", row ${index + 1}, must be an object.');
+        } else {
+          rows.add(row);
+        }
+      }
+      collections[key] = rows;
+    }
+
+    const requiredFields = <String, List<String>>{
+      'items': ['id', 'name'],
+      'customers': ['id', 'name'],
+      'invoices': ['id', 'invoiceNumber', 'paymentMethod'],
+      'invoiceItems': ['id', 'invoiceId', 'itemId', 'itemNameSnapshot'],
+      'suppliers': ['id', 'name'],
+      'purchases': ['id', 'purchaseNumber', 'supplierId'],
+      'purchaseItems': ['id', 'purchaseId', 'itemId', 'itemNameSnapshot'],
+      'expenses': ['id', 'category'],
+      'stockAdjustments': ['id', 'itemId', 'reason'],
+      'stockBatches': ['id', 'itemId'],
+    };
+    final idsByCollection = <String, Set<String>>{};
+
+    for (final entry in collections.entries) {
+      final key = entry.key;
+      final rows = entry.value;
+      final ids = <String>{};
+      for (var index = 0; index < rows.length; index++) {
+        final row = rows[index];
+        final rowNumber = index + 1;
+        for (final field in requiredFields[key] ?? const <String>[]) {
+          if ((row[field]?.toString().trim() ?? '').isEmpty) {
+            errors.add('Backup $key row $rowNumber: required field "$field" is missing.');
+          }
+        }
+        final id = row['id']?.toString().trim() ?? '';
+        if (id.isNotEmpty && !ids.add(id)) {
+          errors.add('Backup $key contains duplicate ID "$id".');
+        }
+      }
+      idsByCollection[key] = ids;
+    }
+
+    void validateReference(
+      String childCollection,
+      String childField,
+      String parentCollection,
+    ) {
+      final parentIds = idsByCollection[parentCollection] ?? const <String>{};
+      final rows = collections[childCollection] ?? const <Map>[];
+      for (var index = 0; index < rows.length; index++) {
+        final value = rows[index][childField];
+        if (value == null || value.toString().trim().isEmpty) continue;
+        if (!parentIds.contains(value.toString())) {
+          errors.add(
+            'Backup $childCollection row ${index + 1}: "$childField" '
+            'does not match a record in "$parentCollection".',
+          );
+        }
+      }
+    }
+
+    validateReference('invoiceItems', 'invoiceId', 'invoices');
+    validateReference('purchases', 'supplierId', 'suppliers');
+    validateReference('purchaseItems', 'purchaseId', 'purchases');
+
+    return errors;
+  }
+
   Future<int> importSnapshot(Map<String, dynamic> snapshot) async {
     if (snapshot['format'] != 'sbill-backup-v1') {
       throw ArgumentError('Unsupported SBILL backup format.');
+    }
+    final validationErrors = validateBackupSnapshot(snapshot);
+    if (validationErrors.isNotEmpty) {
+      throw ArgumentError('Invalid SBILL backup: ${validationErrors.join(' ')}');
     }
     final itemRows = (snapshot['items'] as List?)?.whereType<Map>().toList() ?? const [];
     final customerRows = (snapshot['customers'] as List?)?.whereType<Map>().toList() ?? const [];
@@ -1230,7 +1335,9 @@ class AppDatabase extends _$AppDatabase {
       for (final row in invoiceItemRows) {
         final id = row['id'].toString();
         final invoiceId = row['invoiceId'].toString();
-        if (existingInvoiceItemIds.contains(id) || !importedInvoiceIds.contains(invoiceId)) continue;
+        if (existingInvoiceItemIds.contains(id) ||
+            !(existingInvoiceIds.contains(invoiceId) ||
+              importedInvoiceIds.contains(invoiceId))) continue;
         await into(invoiceItems).insert(InvoiceItemsCompanion(
           id: Value(id),
           invoiceId: Value(invoiceId),
@@ -1295,7 +1402,8 @@ class AppDatabase extends _$AppDatabase {
         final id = row['id'].toString();
         final purchaseId = row['purchaseId'].toString();
         if (existingPurchaseItemIds.contains(id) ||
-            !importedPurchaseIds.contains(purchaseId)) continue;
+            !(existingPurchaseIds.contains(purchaseId) ||
+              importedPurchaseIds.contains(purchaseId))) continue;
         await into(purchaseItems).insert(PurchaseItemsCompanion.insert(
           id: id,
           purchaseId: purchaseId,
