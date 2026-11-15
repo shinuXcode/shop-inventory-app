@@ -11,7 +11,7 @@ Flutter, Dart, Material 3, Riverpod, Drift/SQLite, Supabase, PDF/printing.
 ## Current retail workflows
 
 - POS checkout with exact barcode/SKU entry for USB/Bluetooth HID keyboard-wedge scanners.
-- Integer-paise billing, discounts, tax calculation and transactional stock deduction.
+- Integer-paise billing, discounts, CGST/SGST or IGST calculation selected per invoice, and transactional stock deduction.
 - Inventory, customer history and invoice management.
 - Supplier directory, purchase entry, supplier outstanding balances and purchase history.
 - Stock adjustments with an audit trail, expiry batches and expiry review.
@@ -45,7 +45,7 @@ Apply `supabase/schema.sql` to configure the multi-tenant cloud schema, RLS and 
 - Supplier, purchase, expense, stock-adjustment and expiry-batch history is local-first and included in JSON backups. These new records are not yet mirrored to Supabase. Item stock changes still enqueue the existing item sync event.
 - HID barcode scanners are supported through keyboard input and an Enter suffix. Camera scanning and vendor-specific serial/Bluetooth protocols are not implemented.
 - Printing uses the operating system's print dialog. Direct ESC/POS Bluetooth printing and cash-drawer kick/status commands are not implemented.
-- The PDF service avoids the missing rupee glyph by printing currency codes (for example, INR). Full Devanagari/non-Latin PDF font embedding remains a release task; unsupported characters must not be treated as verified output.
+- The PDF service avoids the missing rupee glyph by printing currency codes (for example, INR). Unsupported Devanagari/non-Latin text is rejected with a clear error until Unicode font embedding is completed.
 - The sync worker is foreground/timer based; OS-killed background sync is not claimed.
 
 The product website is under `website/`.
