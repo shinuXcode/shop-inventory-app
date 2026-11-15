@@ -691,6 +691,13 @@ class AppDatabase extends _$AppDatabase {
         if (entry.value > current.stockQuantity) {
           throw StateError('Insufficient stock for ${current.name}. Available: ${current.stockQuantity}.');
         }
+        final cartItem = cart.firstWhere((line) => line.item.id == entry.key).item;
+        if (current.priceMinor != cartItem.priceMinor ||
+            current.taxRate != cartItem.taxRate) {
+          throw StateError(
+            'Price or GST changed for ${current.name}. Refresh the cart before checkout.',
+          );
+        }
         currentItems[entry.key] = current;
       }
 
