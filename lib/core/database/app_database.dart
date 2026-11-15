@@ -503,9 +503,9 @@ class AppDatabase extends _$AppDatabase {
         final newQuantity = item.stockQuantity + entry.value;
         final weightedCost = newQuantity == 0
             ? 0
-            : ((item.costMinor * item.stockQuantity + purchaseCosts[entry.key]!) /
-                    newQuantity)
-                .round();
+            : (item.costMinor * item.stockQuantity + purchaseCosts[entry.key]! +
+                    newQuantity ~/ 2) ~/
+                newQuantity;
         await (update(items)..where((t) => t.id.equals(entry.key))).write(
           ItemsCompanion(
             stockQuantity: Value(newQuantity),
