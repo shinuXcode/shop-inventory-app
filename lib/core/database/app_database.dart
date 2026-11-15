@@ -1268,13 +1268,20 @@ class AppDatabase extends _$AppDatabase {
       }
 
       if (customerId != null && paymentMethod.trim().toLowerCase() != 'credit') {
+        final receiptId = const Uuid().v4();
         await into(customerPayments).insert(CustomerPaymentsCompanion.insert(
-          id: const Uuid().v4(),
+          id: receiptId,
           customerId: customerId,
           invoiceId: Value(invoiceId),
           amountMinor: totals.totalMinor,
           paymentMethod: paymentMethod.trim().toLowerCase(),
           receivedAt: now,
+        ));
+        await into(syncQueue).insert(SyncQueueCompanion.insert(
+          entityType: 'customerPayment',
+          entityId: receiptId,
+          operation: 'upsert',
+          createdAt: now,
         ));
       }
 

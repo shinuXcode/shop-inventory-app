@@ -48,6 +48,13 @@ void main() {
 
   test('checkout applies customer, discount and payment method to stored invoice', () async {
     final item = await seedItem();
+    final now = DateTime(2026);
+    await db.saveCustomer(CustomersCompanion.insert(
+      id: 'customer-1',
+      name: 'Checkout Customer',
+      createdAt: now,
+      updatedAt: now,
+    ));
     await db.checkout(
       invoiceId: 'invoice-discount',
       invoiceNumber: 'INV-DISCOUNT',
@@ -67,12 +74,15 @@ void main() {
     expect(invoice.gstSupplyType, 'intraState');
     expect(invoice.totalMinor, 45784);
     expect(invoice.paymentMethod, 'upi');
+    expect(invoice.paidMinor, invoice.totalMinor);
+    expect(invoice.paymentStatus, 'paid');
+    expect(await db.customerPaymentsFor('customer-1'), hasLength(1));
     final gst = await db.gstSummaryBetween(DateTime(2026), DateTime(2027));
     expect(gst.cgstMinor, 3492);
     expect(gst.sgstMinor, 3492);
     expect(gst.igstMinor, 0);
     expect(gst.totalMinor, 6984);
-    expect((await db.select(db.syncQueue).get()).length, 3);
+    expect((await db.select(db.syncQueue).get()).length, 5);
   });
 
   test('insufficient stock rolls back invoice and stock changes', () async {
