@@ -163,4 +163,41 @@ void main() {
       250000,
     );
   });
+
+  test('multi-line purchase aggregates duplicate products and weighted cost', () async {
+    final now = DateTime.now();
+    await db.saveSupplier(SuppliersCompanion.insert(
+      id: 'supplier-multi',
+      name: 'Multi Supplier',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await db.into(db.items).insert(ItemsCompanion.insert(
+      id: 'item-multi',
+      name: 'Multi Product',
+      priceMinor: 10000,
+      costMinor: const Value(4000),
+      stockQuantity: const Value(10),
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    await db.recordPurchase(
+      purchaseId: 'purchase-multi',
+      purchaseNumber: 'PUR-MULTI',
+      supplierId: 'supplier-multi',
+      lines: const [
+        PurchaseLine(id: 'multi-line-1', itemId: 'item-multi', quantity: 2, unitCostMinor: 5000, taxRateBps: 0),
+        PurchaseLine(id: 'multi-line-2', itemId: 'item-multi', quantity: 3, unitCostMinor: 6000, taxRateBps: 0),
+      ],
+      discountMinor: 0,
+      paidMinor: 0,
+    );
+
+    final item = await db.select(db.items).getSingle();
+    expect(item.stockQuantity, 15);
+    expect(item.costMinor, 4533);
+    expect(await db.select(db.purchaseItems).get(), hasLength(2));
+    expect(await db.pendingSyncCount(), 1);
+  });
 }
