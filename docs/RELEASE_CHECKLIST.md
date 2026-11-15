@@ -18,6 +18,7 @@
 - [x] Checkout re-reads stock in-transaction and conditionally decrements stock
 - [x] Deterministic integer-paise billing and discount allocation
 - [x] GST calculator and invoice checkout tests for CGST, SGST and IGST
+- [x] Daily CGST/SGST/IGST totals on the dashboard
 - [x] Backup export/restore for new supplier, purchase, expense and expiry data
 - [x] Sync queue retry diagnostics and paginated cloud pulls
 - [x] Regression tests for stale carts, concurrent checkout, billing, PDF pagination, backup restore, purchases, expenses and stock adjustments
