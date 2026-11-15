@@ -185,4 +185,66 @@ void main() {
       expect((await target.select(target.invoices).getSingle()).invoiceNumber, 'INV-RESTORE');
       expect((await target.select(target.invoiceItems).getSingle()).itemNameSnapshot, 'Restore Item');
     });
+
+  test('backup restore imports missing invoice lines when invoice already exists', () async {
+    final source = AppDatabase.forTesting();
+    final target = AppDatabase.forTesting();
+    addTearDown(source.close);
+    addTearDown(target.close);
+    final now = DateTime(2026, 2, 1);
+
+    await source.into(source.items).insert(ItemsCompanion.insert(
+      id: 'merge-item',
+      name: 'Merge Item',
+      priceMinor: 2500,
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await source.into(source.invoices).insert(InvoicesCompanion.insert(
+      id: 'merge-invoice',
+      invoiceNumber: 'INV-MERGE',
+      subtotalMinor: 2500,
+      totalMinor: 2500,
+      paymentMethod: 'cash',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await source.into(source.invoiceItems).insert(InvoiceItemsCompanion.insert(
+      id: 'merge-line',
+      invoiceId: 'merge-invoice',
+      itemId: 'merge-item',
+      itemNameSnapshot: 'Merge Item',
+      quantity: 1,
+      unitPriceMinor: 2500,
+      taxRate: 0,
+      taxMinor: 0,
+      lineTotalMinor: 2500,
+    ));
+
+    await target.into(target.items).insert(ItemsCompanion.insert(
+      id: 'merge-item',
+      name: 'Merge Item',
+      priceMinor: 2500,
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await target.into(target.invoices).insert(InvoicesCompanion.insert(
+      id: 'merge-invoice',
+      invoiceNumber: 'INV-MERGE',
+      subtotalMinor: 2500,
+      totalMinor: 2500,
+      paymentMethod: 'cash',
+      createdAt: now,
+      updatedAt: now,
+    ));
+
+    final imported = await target.importSnapshot(await source.exportSnapshot());
+
+    expect(imported, 1);
+    final lines = await target.invoiceItemsFor('merge-invoice');
+    expect(lines, hasLength(1));
+    expect(lines.single.id, 'merge-line');
+    expect(lines.single.itemNameSnapshot, 'Merge Item');
+  });
+
 }
