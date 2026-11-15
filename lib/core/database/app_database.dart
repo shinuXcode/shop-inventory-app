@@ -67,6 +67,8 @@ class InvoiceItems extends Table {
   TextColumn get skuSnapshot => text().nullable()();
   IntColumn get quantity => integer()();
   IntColumn get unitPriceMinor => integer()();
+  IntColumn get unitCostMinor => integer().withDefault(const Constant(0))();
+  IntColumn get lineDiscountMinor => integer().withDefault(const Constant(0))();
   RealColumn get taxRate => real()();
   IntColumn get taxMinor => integer()();
   IntColumn get lineTotalMinor => integer()();
@@ -168,7 +170,7 @@ class TopSellingItem {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
-  @override int get schemaVersion => 2;
+  @override int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -181,6 +183,10 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(expenses);
             await m.createTable(stockAdjustments);
             await m.createTable(stockBatches);
+          }
+          if (from < 3) {
+            await m.addColumn(invoiceItems, invoiceItems.unitCostMinor);
+            await m.addColumn(invoiceItems, invoiceItems.lineDiscountMinor);
           }
         },
         beforeOpen: (details) async {
@@ -591,6 +597,28 @@ class AppDatabase extends _$AppDatabase {
     return result;
   }
 
+  Future<List<Expense>> recentExpenses({int limit = 50}) =>
+      (select(expenses)
+            ..orderBy([(t) => OrderingTerm.desc(t.incurredAt)])
+            ..limit(limit))
+          .get();
+
+  Future<int> grossProfitBetween(DateTime start, DateTime end) async {
+    final row = await customSelect(
+      'SELECT COALESCE(SUM((ii.unit_price_minor * ii.quantity) - '
+      'ii.line_discount_minor - (ii.unit_cost_minor * ii.quantity)), 0) AS profit '
+      'FROM invoice_items ii INNER JOIN invoices i ON i.id = ii.invoice_id '
+      'WHERE i.created_at >= ? AND i.created_at < ? AND i.status != ?',
+      variables: [
+        Variable<DateTime>(start),
+        Variable<DateTime>(end),
+        const Variable<String>('cancelled'),
+      ],
+      readsFrom: {invoiceItems, invoices},
+    ).getSingle();
+    return row.read<int>('profit');
+  }
+
   Future<int> expensesBetween(DateTime start, DateTime end) async {
     final rows = await (select(expenses)
           ..where((t) =>
@@ -696,6 +724,8 @@ class AppDatabase extends _$AppDatabase {
           quantity: line.quantity,
           unitPriceMinor: current.priceMinor,
           taxRate: current.taxRate,
+          unitCostMinor: Value(current.costMinor),
+          lineDiscountMinor: Value(lineDiscount),
           taxMinor: lineTax,
           lineTotalMinor: lineSubtotal - lineDiscount + lineTax,
         ));
@@ -813,6 +843,7 @@ class AppDatabase extends _$AppDatabase {
         'id': x.id, 'invoiceId': x.invoiceId, 'itemId': x.itemId,
         'itemNameSnapshot': x.itemNameSnapshot, 'skuSnapshot': x.skuSnapshot,
         'quantity': x.quantity, 'unitPriceMinor': x.unitPriceMinor,
+        'unitCostMinor': x.unitCostMinor, 'lineDiscountMinor': x.lineDiscountMinor,
         'taxRate': x.taxRate, 'taxMinor': x.taxMinor, 'lineTotalMinor': x.lineTotalMinor,
       }).toList(),
       'suppliers': supplierRows.map((x) => {
@@ -1090,6 +1121,8 @@ class AppDatabase extends _$AppDatabase {
           skuSnapshot: Value(_nullable(row['skuSnapshot'])),
           quantity: Value(_number(row['quantity'])),
           unitPriceMinor: Value(_number(row['unitPriceMinor'])),
+          unitCostMinor: Value(_number(row['unitCostMinor'])),
+          lineDiscountMinor: Value(_number(row['lineDiscountMinor'])),
           taxRate: Value(_decimal(row['taxRate'])),
           taxMinor: Value(_number(row['taxMinor'])),
           lineTotalMinor: Value(_number(row['lineTotalMinor'])),
