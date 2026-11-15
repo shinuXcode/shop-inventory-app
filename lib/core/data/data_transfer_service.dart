@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:cross_file/cross_file.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -37,13 +36,12 @@ class ImportPreview {
 
 class DataTransferService {
   static Future<ImportPreview?> pick() async {
-    final result = await FilePicker.pickFiles(
+    final pickedFiles = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'json', 'txt'],
-      allowMultiple: false,
     );
-    if (result == null || result.files.isEmpty) return null;
-    final picked = result.files.first;
+    if (pickedFiles == null || pickedFiles.isEmpty) return null;
+    final picked = pickedFiles.first;
     final bytes = await picked.readAsBytes();
     return parseFile(picked.name, bytes);
   }
