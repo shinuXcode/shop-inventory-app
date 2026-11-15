@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sbill/core/database/app_database.dart';
+import 'package:sbill/core/billing/indian_gst.dart';
 
 void main() {
   late AppDatabase db;
@@ -60,6 +61,10 @@ void main() {
     expect(invoice!.customerId, 'customer-1');
     expect(invoice.discountMinor, 1000);
     expect(invoice.taxMinor, 6984);
+    expect(invoice.cgstMinor, 3492);
+    expect(invoice.sgstMinor, 3492);
+    expect(invoice.igstMinor, 0);
+    expect(invoice.gstSupplyType, 'intraState');
     expect(invoice.totalMinor, 45784);
     expect(invoice.paymentMethod, 'upi');
     expect((await db.select(db.syncQueue).get()).length, 3);
@@ -133,5 +138,28 @@ void main() {
     expect(outcomes.where((success) => success), hasLength(1));
     expect((await db.select(db.items).getSingle()).stockQuantity, 0);
     expect((await db.select(db.invoices).get()).length, 1);
+  });
+
+  test('inter-state checkout stores IGST instead of CGST and SGST', () async {
+    final item = await seedItem();
+    await db.checkout(
+      invoiceId: 'invoice-interstate',
+      invoiceNumber: 'INV-INTERSTATE',
+      cart: [CartLine(id: 'line-interstate', item: item, quantity: 1)],
+      discountMinor: 0,
+      paymentMethod: 'upi',
+      gstSupplyType: GstSupplyType.interState,
+    );
+
+    final invoice = await db.invoiceById('invoice-interstate');
+    expect(invoice, isNotNull);
+    expect(invoice!.gstSupplyType, 'interState');
+    expect(invoice.cgstMinor, 0);
+    expect(invoice.sgstMinor, 0);
+    expect(invoice.igstMinor, 3582);
+    final line = (await db.invoiceItemsFor(invoice.id)).single;
+    expect(line.igstMinor, 3582);
+    expect(line.cgstMinor, 0);
+    expect(line.sgstMinor, 0);
   });
 }
