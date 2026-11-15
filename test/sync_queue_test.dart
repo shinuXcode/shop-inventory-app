@@ -43,7 +43,7 @@ void main() {
       createdAt: now,
       updatedAt: now,
     ));
-    await db.saveItem(ItemsCompanion.insert(
+    await db.into(db.items).insert(ItemsCompanion.insert(
       id: 'item-sync',
       name: 'Local Product',
       priceMinor: 5000,
