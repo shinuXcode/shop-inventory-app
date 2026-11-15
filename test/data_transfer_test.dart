@@ -270,4 +270,63 @@ void main() {
     expect(await db.select(db.items).get(), isEmpty);
   });
 
+
+  test('backup restore imports missing purchase lines when purchase already exists', () async {
+    final source = AppDatabase.forTesting();
+    final target = AppDatabase.forTesting();
+    addTearDown(source.close);
+    addTearDown(target.close);
+    final now = DateTime(2026, 2, 2);
+
+    await source.into(source.suppliers).insert(SuppliersCompanion.insert(
+      id: 'merge-supplier',
+      name: 'Merge Supplier',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await source.into(source.purchases).insert(PurchasesCompanion.insert(
+      id: 'merge-purchase',
+      purchaseNumber: 'PUR-MERGE',
+      supplierId: 'merge-supplier',
+      subtotalMinor: 3000,
+      totalMinor: 3000,
+      createdAt: now,
+    ));
+    await source.into(source.purchaseItems).insert(PurchaseItemsCompanion.insert(
+      id: 'merge-purchase-line',
+      purchaseId: 'merge-purchase',
+      itemId: 'merge-item',
+      itemNameSnapshot: 'Merge Item',
+      quantity: 1,
+      unitCostMinor: 3000,
+      taxRate: 0,
+      taxMinor: 0,
+      lineTotalMinor: 3000,
+    ));
+
+    await target.into(target.suppliers).insert(SuppliersCompanion.insert(
+      id: 'merge-supplier',
+      name: 'Merge Supplier',
+      createdAt: now,
+      updatedAt: now,
+    ));
+    await target.into(target.purchases).insert(PurchasesCompanion.insert(
+      id: 'merge-purchase',
+      purchaseNumber: 'PUR-MERGE',
+      supplierId: 'merge-supplier',
+      subtotalMinor: 3000,
+      totalMinor: 3000,
+      createdAt: now,
+    ));
+
+    final imported = await target.importSnapshot(await source.exportSnapshot());
+
+    expect(imported, 1);
+    final lines = await (target.select(target.purchaseItems)
+          ..where((row) => row.purchaseId.equals('merge-purchase')))
+        .get();
+    expect(lines, hasLength(1));
+    expect(lines.single.id, 'merge-purchase-line');
+  });
+
 }
