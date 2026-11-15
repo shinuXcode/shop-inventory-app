@@ -203,6 +203,7 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(invoices, invoices.sgstMinor);
             await m.addColumn(invoices, invoices.igstMinor);
             await m.addColumn(invoices, invoices.gstSupplyType);
+            await customStatement("UPDATE invoices SET gst_supply_type = 'unknown'");
             await m.addColumn(invoiceItems, invoiceItems.cgstMinor);
             await m.addColumn(invoiceItems, invoiceItems.sgstMinor);
             await m.addColumn(invoiceItems, invoiceItems.igstMinor);
@@ -1213,7 +1214,7 @@ class AppDatabase extends _$AppDatabase {
           cgstMinor: Value(_number(row['cgstMinor'])),
           sgstMinor: Value(_number(row['sgstMinor'])),
           igstMinor: Value(_number(row['igstMinor'])),
-          gstSupplyType: Value(row['gstSupplyType']?.toString() ?? 'intraState'),
+          gstSupplyType: Value(row['gstSupplyType']?.toString() ?? 'unknown'),
           totalMinor: Value(_number(row['totalMinor'])),
           paymentMethod: Value(row['paymentMethod'].toString()),
           status: Value(row['status']?.toString() ?? 'completed'),
