@@ -129,7 +129,11 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Text('Subtotal: ' + money(invoice.subtotalMinor)),
                   Text('Discount: -' + money(invoice.discountMinor)),
-                  Text('Tax: ' + money(invoice.taxMinor)),
+                  if (invoice.cgstMinor > 0) Text('CGST: ' + money(invoice.cgstMinor)),
+                  if (invoice.sgstMinor > 0) Text('SGST: ' + money(invoice.sgstMinor)),
+                  if (invoice.igstMinor > 0) Text('IGST: ' + money(invoice.igstMinor)),
+                  if (invoice.cgstMinor == 0 && invoice.sgstMinor == 0 && invoice.igstMinor == 0)
+                    Text('GST / Tax: ' + money(invoice.taxMinor)),
                   Text('Payment: ' + invoice.paymentMethod.toUpperCase()),
                   Text('Total: ' + money(invoice.totalMinor), style: const TextStyle(fontWeight: FontWeight.bold)),
                 ]),
