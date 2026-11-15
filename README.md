@@ -11,7 +11,7 @@ Flutter, Dart, Material 3, Riverpod, Drift/SQLite, Supabase, PDF/printing.
 ## Current retail workflows
 
 - POS checkout with exact barcode/SKU entry for USB/Bluetooth HID keyboard-wedge scanners.
-- Integer-paise billing, discounts, CGST/SGST or IGST calculation selected per invoice, and transactional stock deduction.
+- Integer-paise billing, discounts, HSN/SAC product codes, CGST/SGST or IGST calculation selected per invoice, and transactional stock deduction.
 - Inventory, customer history and invoice management.
 - Supplier directory, purchase entry, supplier outstanding balances and purchase history.
 - Stock adjustments with an audit trail, expiry batches and expiry review.
