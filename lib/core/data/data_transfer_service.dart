@@ -40,7 +40,7 @@ class DataTransferService {
       type: FileType.custom,
       allowedExtensions: ['csv', 'json', 'txt'],
     );
-    if (pickedFiles == null || pickedFiles.isEmpty) return null;
+    if (pickedFiles.isEmpty) return null;
     final picked = pickedFiles.first;
     final bytes = await picked.readAsBytes();
     return parseFile(picked.name, bytes);
