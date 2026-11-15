@@ -496,6 +496,30 @@ class AppDatabase extends _$AppDatabase {
     ));
   }
 
+  Future<void> _consumeStockBatches(String itemId, int quantity) async {
+    if (quantity <= 0) return;
+    final batches = await (select(stockBatches)
+          ..where((t) =>
+              t.itemId.equals(itemId) & t.quantity.isBiggerThanValue(0)))
+        .get();
+    batches.sort((a, b) {
+      final aExpiry = a.expiryDate ?? DateTime(9999);
+      final bExpiry = b.expiryDate ?? DateTime(9999);
+      final byExpiry = aExpiry.compareTo(bExpiry);
+      return byExpiry != 0 ? byExpiry : a.createdAt.compareTo(b.createdAt);
+    });
+    var remaining = quantity;
+    for (final batch in batches) {
+      if (remaining == 0) break;
+      final consumed = batch.quantity < remaining ? batch.quantity : remaining;
+      await (update(stockBatches)..where((t) => t.id.equals(batch.id))).write(
+        StockBatchesCompanion(quantity: Value(batch.quantity - consumed)),
+      );
+      remaining -= consumed;
+    }
+    // Any remaining units are legacy/opening stock that has no batch record.
+  }
+
   Future<void> adjustStock({
     required String id,
     required String itemId,
@@ -526,6 +550,16 @@ class AppDatabase extends _$AppDatabase {
         throw StateError(
           'Stock adjustment would make inventory negative or the product is missing.',
         );
+      }
+      if (quantityDelta < 0) {
+        await _consumeStockBatches(itemId, -quantityDelta);
+      } else {
+        await into(stockBatches).insert(StockBatchesCompanion.insert(
+          id: const Uuid().v4(),
+          itemId: itemId,
+          quantity: quantityDelta,
+          createdAt: now,
+        ));
       }
       await into(stockAdjustments).insert(StockAdjustmentsCompanion.insert(
         id: id,
@@ -686,6 +720,7 @@ class AppDatabase extends _$AppDatabase {
         if (changed != 1) {
           throw StateError('Stock changed during checkout. Refresh the cart and try again.');
         }
+        await _consumeStockBatches(entry.key, entry.value);
       }
 
       await into(syncQueue).insert(SyncQueueCompanion.insert(
