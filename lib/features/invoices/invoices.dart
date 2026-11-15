@@ -131,7 +131,11 @@ class _InvoicesPageState extends ConsumerState<InvoicesPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Text(invoice.gstSupplyType == 'interState' ? 'Supply: Inter-state' : 'Supply: Intra-state'),
+                  Text(invoice.gstSupplyType == 'interState'
+                    ? 'Supply: Inter-state'
+                    : invoice.gstSupplyType == 'intraState'
+                        ? 'Supply: Intra-state'
+                        : 'Supply type: Not recorded'),
                   Text('Subtotal: ' + money(invoice.subtotalMinor)),
                   Text('Discount: -' + money(invoice.discountMinor)),
                   if (invoice.cgstMinor > 0) Text('CGST: ' + money(invoice.cgstMinor)),
